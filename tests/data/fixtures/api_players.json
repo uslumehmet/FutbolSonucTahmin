@@ -1,0 +1,1 @@
+{"errors": [], "paging": {"current": 1, "total": 1}, "response": [{"player": {"id": 1460, "name": "B. Saka"}, "statistics": [{"team": {"id": 42}, "league": {"id": 39}, "games": {"appearences": 11, "minutes": 900, "position": "Attacker"}, "goals": {"total": 6, "assists": 5}}]}]}

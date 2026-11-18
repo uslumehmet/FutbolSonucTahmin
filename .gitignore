@@ -7,7 +7,7 @@
 secrets*
 
 # --- Yerel veri: veritabanı, indirilen veriler, eğitilmiş modeller, kayıtlar ---
-data/
+/data/
 *.db
 *.db-shm
 *.db-wal
