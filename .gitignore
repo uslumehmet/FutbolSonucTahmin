@@ -34,3 +34,8 @@ htmlcov/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Özel notlar (yalnızca bu bilgisayarda, GitHub'a gitmez)
+/PROJE_NOTLARI.md
+/CLAUDE.md
+/docs/superpowers/
