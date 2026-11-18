@@ -121,6 +121,17 @@ def create_app(session_factory=None, start_scheduler: bool = True, clock=None) -
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
     from app.web import auth
     app.middleware("http")(auth.auth_middleware)
+
+    async def static_cache(request: Request, call_next):
+        # Tarayıcı css/js dosyalarını her sayfa geçişinde yeniden sormasın. Adresinde ?v= olanlar
+        # her kurulumda değişir, o yüzden uzun süre saklanabilir.
+        resp = await call_next(request)
+        if request.url.path.startswith("/static/") and resp.status_code == 200:
+            resp.headers["Cache-Control"] = ("public, max-age=31536000, immutable" if "v" in request.query_params
+                                             else "public, max-age=86400")
+        return resp
+
+    app.middleware("http")(static_cache)
     app.include_router(auth.router)
 
     def render(request: Request, name: str, ctx: dict, status: int = 200) -> HTMLResponse:

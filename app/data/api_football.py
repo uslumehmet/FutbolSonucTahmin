@@ -46,8 +46,16 @@ class ApiFootball:
         self.clock = clock or (lambda: datetime.now(UTC))
         self.sleeper = sleeper or time.sleep
         self._recent: list[datetime] = []
-        self.client = httpx.Client(transport=transport, timeout=30,
-                                   headers={"x-apisports-key": api_key, "User-Agent": "futbol-sonuc-tahmin/1.0"})
+        self._transport = transport
+        self._client: httpx.Client | None = None
+
+    @property
+    def client(self) -> httpx.Client:
+        # İlk gerçek istekte kurulur: kurmak ~0,25 sn sürüyor (SSL), sadece sayaç okuyan sayfaları yavaşlatmasın.
+        if self._client is None:
+            self._client = httpx.Client(transport=self._transport, timeout=30,
+                                        headers={"x-apisports-key": self.api_key, "User-Agent": "futbol-sonuc-tahmin/1.0"})
+        return self._client
 
     # --- temel ---
     @staticmethod

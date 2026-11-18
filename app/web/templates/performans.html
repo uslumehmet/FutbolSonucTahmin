@@ -119,7 +119,7 @@
 </details>
 {% endblock %}
 {% block scripts %}
-<script src="/static/vendor/chart.umd.min.js"></script>
+<script src="/static/vendor/chart.umd.min.js?v={{ ASSET_V }}"></script>
 <script>
 (function () {
   const series = {{ series_json|safe }};

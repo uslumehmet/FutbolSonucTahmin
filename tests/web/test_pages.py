@@ -187,3 +187,11 @@ def test_performance_has_one_chart_with_wallet_picker(client_seeded, session_fac
     assert text.count('id="kasaChart"') == 1  # tek grafik
     assert text.count('class="wtab"') == n  # her kasa seçicide, yeni açılan da
     assert "Yeni Deneme Kasası" in text and "Model ayrıntıları" in text
+
+
+def test_static_files_cached_by_browser(client_seeded):
+    page = client_seeded.get("/").text
+    assert "/static/vendor/htmx.min.js?v=" in page
+    r = client_seeded.get("/static/app.css?v=1")
+    assert r.status_code == 200 and "immutable" in r.headers["cache-control"]
+    assert "max-age=86400" in client_seeded.get("/static/app.css").headers["cache-control"]

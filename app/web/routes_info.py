@@ -9,7 +9,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.betting.settlement import wallet_stats
-from app.betting.stats import live_calibration, mode_stats, singles_stats
+from app.betting.stats import calibration_rows, live_calibration, mode_stats, singles_stats
 from app.config import api_key, get_settings, get_value, save_settings, set_value
 from app.data.api_football import ApiFootball, probe
 from app.data.ingest import competition_teams
@@ -48,7 +48,8 @@ def performance(request: Request):
         modes = {m: mode_stats(s, m) for m in ("safe", "value")}
         singles = {m: {"total": singles_stats(s, m), "market": singles_stats(s, m, "market"),
                        "league": singles_stats(s, m, "league")} for m in ("safe", "value")}
-        calib = {g: live_calibration(s, g) for g in GROUP_LABELS}
+        cal_rows = calibration_rows(s)
+        calib = {g: live_calibration(s, g, rows=cal_rows) for g in GROUP_LABELS}
         bt = s.query(BacktestRun).order_by(BacktestRun.id.desc()).first()
         settled = s.query(Coupon).filter(Coupon.source == "auto", Coupon.status.in_(("won", "lost", "void"))).count()
         ctx = {"nav": "performans", "rows": rows, "series_json": json.dumps(series), "modes": modes,

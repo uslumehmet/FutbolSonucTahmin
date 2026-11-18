@@ -121,8 +121,9 @@ def wallet_stats(session, wallet: Wallet) -> WalletStats:
     st = WalletStats()
     events: list[tuple[datetime, int]] = []
     results: list[tuple[datetime, int]] = []
-    for bet in session.query(Bet).filter_by(wallet_id=wallet.id).all():
-        coupon = session.get(Coupon, bet.coupon_id)
+    rows = (session.query(Bet, Coupon.status).join(Coupon, Coupon.id == Bet.coupon_id)
+            .filter(Bet.wallet_id == wallet.id).all())  # tek sorgu: bahis başına kupon sorgusu yok
+    for bet, coupon_status in rows:
         events.append((bet.placed_at, -bet.stake))
         if bet.payout is None:
             st.open += 1
@@ -132,9 +133,9 @@ def wallet_stats(session, wallet: Wallet) -> WalletStats:
         st.returned += bet.payout
         events.append((bet.settled_at or bet.placed_at, bet.payout))
         results.append((bet.settled_at or bet.placed_at, bet.payout - bet.stake))
-        if coupon.status == "won":
+        if coupon_status == "won":
             st.won += 1
-        elif coupon.status == "lost":
+        elif coupon_status == "lost":
             st.lost += 1
         else:
             st.void += 1
