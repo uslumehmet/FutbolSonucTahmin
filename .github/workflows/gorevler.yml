@@ -23,21 +23,21 @@ permissions:
 
 jobs:
   calistir:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
-          python-version-file: .python-version
+          python-version: "3.14"   # .python-version'daki tam sürüm her sunucu görüntüsünde bulunmayabiliyor
           cache: pip
 
       - name: Paketleri kur
         run: pip install -r requirements.txt
 
       - name: İndirilen veri önbelleği (openfootball, milli maçlar)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: data/raw
           key: raw-${{ github.run_id }}
