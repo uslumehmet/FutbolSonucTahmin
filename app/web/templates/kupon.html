@@ -28,7 +28,7 @@
       <legend><b>Ligler</b></legend>
       {% if leagues %}
         {% for code, name, n in leagues %}<label style="display:block"><input type="checkbox" name="lig" value="{{ code }}"> {{ name }} ({{ n }} maç)</label>{% endfor %}
-      {% else %}<small class="soft">Şu an oranı olan maç yok. Oranlar her sabah 10:30'da gelir;<br>ücretsiz plan yalnızca bugünün ve yarının maçlarını verir.</small>{% endif %}
+      {% else %}<small class="soft">Şu an oranı olan maç yok. Oranlar her sabah güncellenir;<br>ücretsiz plan yalnızca bugünün ve yarının maçlarını verir.</small>{% endif %}
     </fieldset>
   </div>
   <p class="soft"><small><b>Güvenli</b>: tutma ihtimali en yüksek seçimler. <b>Değerli</b>: ihtimali yüksek ve oranı hak ettiğinden fazla olan seçimler. Hiçbir lig işaretlemezseniz hepsi dahil.</small></p>

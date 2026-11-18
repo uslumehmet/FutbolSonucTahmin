@@ -21,18 +21,22 @@ Bilgisayar kapalıyken sistem çalışmaz. Açtığınızda kaçırdığı işle
 Anahtar olmadan yaklaşan maçlar, oranlar ve sakat/cezalı listeleri gelmez; geçmiş veriler ve test raporu yine görünür.
 
 ## Sistem ne zaman ne yapar (Türkiye saati)
+Site bulutta çalışırken işler GitHub'da yapılır; GitHub bazen 5–30 dakika geç başlatır.
+
 | Saat | İş |
 |---|---|
-| 10:30 | Yaklaşan maçlar, oranlar, eksik oyuncular ve tahminler güncellenir |
-| 11:00 | Sistem iki moddan (Güvenli, Değerli) 2, 3 ve 5 oranlı kuponları sanal kasalarla oynar |
-| 09:00, 15:00, 20:00, 00:30 | Biten maçlar sonuçlandırılır |
-| Pazartesi 03:00 | Makine öğrenmesi katmanı yeniden eğitilir |
+| 09:07 | Biten maçlar sonuçlandırılır; yaklaşan maçlar, oranlar, eksik oyuncular ve tahminler güncellenir |
+| 11:07 | Sistem iki moddan (Güvenli, Değerli) 2, 3 ve 5 oranlı kuponları sanal kasalarla oynar (12:37'de yedek deneme) |
+| 15:07, 20:07, 00:37 | Biten maçlar sonuçlandırılır |
+| Haftada bir | Modeller yeniden eğitilir |
+
+Site sadece bilgisayarda çalıştırılırsa saatler biraz farklıdır: 10:30 güncelleme, 11:00 otomatik oyun, 09:00/15:00/20:00/00:30 sonuçlandırma, Pazartesi 03:00 yeniden eğitim.
 
 ## Sayfalar
-- **Maçlar:** Her maçın 1-X-2 ihtimal çubuğu, 2.5 Üst ve KG Var ihtimali, Güvenli/Değerli seçimi. "7 gün" sekmesi haftanın bütün maçlarını gösterir; "oran 1 gün önce gelir" etiketli maçlar sezon fikstüründen gelmiştir, saatleri değişebilir.
-- **Maç detayı:** Bütün bahis seçenekleri (ihtimal, oran, değer), gerekçe, iki takımın son maçları, aralarındaki maçlar, eksik oyuncular. Eksik oyuncuyu elle ekleyebilirsiniz; tahmin hemen güncellenir.
+- **Maçlar:** Her maçın 1-X-2 ihtimal çubuğu, toplam gol 1.5/2.5 Üst, KG Var ve iki takımın ayrı ayrı 1.5 Üst ihtimali, Güvenli/Değerli seçimi. "7 gün" sekmesi haftanın bütün maçlarını gösterir; "oran 1 gün önce gelir" etiketli maçlar sezon fikstüründen gelmiştir, saatleri değişebilir.
+- **Maç detayı:** Bütün bahis seçenekleri (ihtimal, oran, değer), gerekçe, iki takımın son maçları, aralarındaki maçlar, eksik oyuncular. Eksik oyuncuyu elle ekleyebilirsiniz; tahmin hemen güncellenir. "Toplam gol 1.5 Alt" iki takımın gollerinin toplamıdır; "Galler golleri 1.5 Alt" gibi takım adıyla yazanlar sadece o takımın gollerini sayar.
 - **Kupon oluştur:** Hedef oran + mod seçin, sistem en yüksek tutma ihtimalli kuponu kurar; sanal kasanızla oynarsınız.
-- **Kuponlarım:** Her kasanın kuponları, tuttu/tutmadı durumu. Üstte sistemin bugünkü otomatik oyununun ne zaman yapıldığı, kaç kupon oynandığı, oynanmadıysa nedeni ve sıradaki maç günü yazar. Bilgisayar 11:00'den sonra açılırsa otomatik oyun açılışta, henüz başlamamış maçlarla (başlamasına en az 1 saat olan) yapılır.
+- **Kuponlarım:** Her kasanın kuponları, tuttu/tutmadı durumu. Üstte sistemin bugünkü otomatik oyununun ne zaman yapıldığı, kaç kupon oynandığı, oynanmadıysa nedeni ve sıradaki maç günü yazar. Otomatik oyun gecikirse, henüz başlamamış maçlarla (başlamasına en az 1 saat olan) yapılır.
 - **Kasalar:** 100 ₺ ve 1.000 ₺ gibi farklı başlangıçlı kasalar; istediğiniz kadar yenisini açabilirsiniz.
 - **Performans:** Hangi mod kazandırıyor, model söylediği ihtimallerde ne kadar isabetli, geçmiş test raporu.
 

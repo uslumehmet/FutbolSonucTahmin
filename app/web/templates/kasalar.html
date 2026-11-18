@@ -29,8 +29,8 @@
           <button class="btn small light" type="submit">Kaydet</button>
         </form>{% endif %}</td>
       <td>
-        <form method="post" action="/kasalar/{{ w.id }}/sifirla" style="display:inline"><button class="linkbtn" type="submit">Sıfırla</button></form>
-        <form method="post" action="/kasalar/{{ w.id }}/sil" style="display:inline; margin-left:.5rem"><button class="linkbtn" type="submit">Sil</button></form>
+        <form method="post" action="/kasalar/{{ w.id }}/sifirla" style="display:inline" data-confirm="{{ w.name }} kasası başlangıç parasına dönecek ve kupon geçmişi silinecek. Emin misiniz?"><button class="linkbtn" type="submit">Sıfırla</button></form>
+        <form method="post" action="/kasalar/{{ w.id }}/sil" style="display:inline; margin-left:.5rem" data-confirm="{{ w.name }} kasası ve bütün kuponları silinecek. Bu geri alınamaz. Emin misiniz?"><button class="linkbtn" type="submit">Sil</button></form>
       </td>
     </tr>
     {% endfor %}

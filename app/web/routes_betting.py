@@ -98,7 +98,7 @@ def coupon_create(request: Request, hedef: str = Form("3"), mod: str = Form("saf
                           + ", ".join(available) + ". Lig seçimini kaldırıp tekrar deneyin.")
             elif not cands:
                 reason = ("Bu aralıkta oranı ve tahmini olan maç yok. Ücretsiz API planı yalnızca bugünün ve "
-                          "yarının maçlarını verir; oranlar her sabah 10:30'da güncellenir.")
+                          "yarının maçlarını verir; oranlar her sabah güncellenir.")
             elif not coupons:
                 reason = ("Bu aralıkta değerli seçim yetersiz; hedef oranı düşürün ya da daha uzun bir aralık seçin."
                           if mode == "value" else

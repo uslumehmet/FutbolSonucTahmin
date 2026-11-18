@@ -68,11 +68,11 @@
 <section class="panel">
   <h2>Son işler</h2>
   <table>
-    <tr><td>Veri güncelleme</td><td>{% if last_update %}{{ last_update.at[:16]|replace('T', ' ') }} UTC: {{ last_update.fixtures }} maç, {{ last_update.odds }} oran, {{ last_update.missing }} eksik
+    <tr><td>Veri güncelleme</td><td>{% if last_update %}{{ last_update.at|local_iso }}: {{ last_update.fixtures }} maç, {{ last_update.odds }} oran, {{ last_update.missing }} eksik
       {% for f in last_update.fallbacks %}<br><small>{{ f }}</small>{% endfor %}{% for e in last_update.errors[:5] %}<br><small class="soft">{{ e }}</small>{% endfor %}{% else %}henüz yok{% endif %}</td></tr>
-    <tr><td>Otomatik oyun</td><td>{% if last_autoplay %}{{ last_autoplay.at[:16]|replace('T', ' ') }} UTC: {{ last_autoplay.coupons }} kupon, {{ last_autoplay.singles }} tekli
+    <tr><td>Otomatik oyun</td><td>{% if last_autoplay %}{{ last_autoplay.at|local_iso }}: {{ last_autoplay.coupons }} kupon, {{ last_autoplay.singles }} tekli
       {% for k in last_autoplay.skipped %}<br><small class="soft">{{ k }}</small>{% endfor %}{% else %}henüz yok{% endif %}</td></tr>
-    <tr><td>Sonuçlandırma</td><td>{% if last_settle %}{{ last_settle.at[:16]|replace('T', ' ') }} UTC: {{ last_settle.coupons }} kupon, {{ last_settle.bets }} bahis{% else %}henüz yok{% endif %}</td></tr>
+    <tr><td>Sonuçlandırma</td><td>{% if last_settle %}{{ last_settle.at|local_iso }}: {{ last_settle.coupons }} kupon, {{ last_settle.bets }} bahis{% else %}henüz yok{% endif %}</td></tr>
   </table>
 </section>
 {% endblock %}

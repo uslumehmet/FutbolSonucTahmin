@@ -43,7 +43,7 @@ def test_singles_stats_by_market(session):
     total = singles_stats(session, "value")[0]
     assert total["n"] == 3 and total["won"] == 2 and total["unit_roi"] == pytest.approx((2.0 + 1.8 - 3) / 3)
     by = {r["key"]: r for r in singles_stats(session, "value", by="market")}
-    assert by["MS 1"]["n"] == 2 and by["2.5 Üst"]["won"] == 1
+    assert by["MS 1"]["n"] == 2 and by["Toplam gol 2.5 Üst"]["won"] == 1
 
 
 def test_live_calibration(session):

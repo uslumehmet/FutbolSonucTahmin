@@ -11,15 +11,33 @@ MARKETS = ["MS1", "MSX", "MS2", "CS1X", "CS12", "CSX2",
 MARKET_LABELS = {
     "MS1": "MS 1", "MSX": "MS X", "MS2": "MS 2",
     "CS1X": "ÇŞ 1X", "CS12": "ÇŞ 12", "CSX2": "ÇŞ X2",
-    "UST15": "1.5 Üst", "ALT15": "1.5 Alt",
-    "UST25": "2.5 Üst", "ALT25": "2.5 Alt",
-    "UST35": "3.5 Üst", "ALT35": "3.5 Alt",
+    "UST15": "Toplam gol 1.5 Üst", "ALT15": "Toplam gol 1.5 Alt",
+    "UST25": "Toplam gol 2.5 Üst", "ALT25": "Toplam gol 2.5 Alt",
+    "UST35": "Toplam gol 3.5 Üst", "ALT35": "Toplam gol 3.5 Alt",
     "KGVAR": "KG Var", "KGYOK": "KG Yok",
-    "EVUST05": "Ev sahibi 0.5 Üst", "EVALT05": "Ev sahibi 0.5 Alt",
-    "EVUST15": "Ev sahibi 1.5 Üst", "EVALT15": "Ev sahibi 1.5 Alt",
-    "DEPUST05": "Deplasman 0.5 Üst", "DEPALT05": "Deplasman 0.5 Alt",
-    "DEPUST15": "Deplasman 1.5 Üst", "DEPALT15": "Deplasman 1.5 Alt",
+    "EVUST05": "Ev sahibi golleri 0.5 Üst", "EVALT05": "Ev sahibi golleri 0.5 Alt",
+    "EVUST15": "Ev sahibi golleri 1.5 Üst", "EVALT15": "Ev sahibi golleri 1.5 Alt",
+    "DEPUST05": "Deplasman golleri 0.5 Üst", "DEPALT05": "Deplasman golleri 0.5 Alt",
+    "DEPUST15": "Deplasman golleri 1.5 Üst", "DEPALT15": "Deplasman golleri 1.5 Alt",
 }
+
+
+def market_label(key: str, home: str | None = None, away: str | None = None) -> str:
+    """Bahsin adı; takım adları verilirse "Ev sahibi"/"Deplasman" yerine takımın adı yazılır.
+
+    Toplam gol bahisleri her zaman "Toplam gol" diye başlar; tek takımın golleri takımın adıyla
+    yazılır ("Galler golleri 1.5 Alt"). Böylece iki tür birbirine karışmaz.
+    """
+    label = MARKET_LABELS.get(key, key)
+    if not (home and away):
+        return label
+    if key.startswith("EV"):
+        return label.replace("Ev sahibi", home, 1)
+    if key.startswith("DEP"):
+        return label.replace("Deplasman", away, 1)
+    return {"MS1": f"MS 1 ({home} kazanır)", "MSX": "MS X (beraberlik)", "MS2": f"MS 2 ({away} kazanır)",
+            "CS1X": f"ÇŞ 1X ({home} kaybetmez)", "CS12": "ÇŞ 12 (beraberlik olmaz)",
+            "CSX2": f"ÇŞ X2 ({away} kaybetmez)"}.get(key, label)
 
 MARKET_HELP = {
     "MS1": "Maç sonucu 1: maçı ev sahibi kazanır.",
@@ -28,22 +46,22 @@ MARKET_HELP = {
     "CS1X": "Çifte şans 1X: ev sahibi kazanır ya da berabere biter (deplasman kazanmazsa tutar).",
     "CS12": "Çifte şans 12: bir takım kazanır, beraberlik olmaz.",
     "CSX2": "Çifte şans X2: deplasman kazanır ya da berabere biter (ev sahibi kazanmazsa tutar).",
-    "UST15": "1.5 Üst: maçta toplam en az 2 gol olur.",
-    "ALT15": "1.5 Alt: maçta toplam en fazla 1 gol olur.",
-    "UST25": "2.5 Üst: maçta toplam en az 3 gol olur.",
-    "ALT25": "2.5 Alt: maçta toplam en fazla 2 gol olur.",
-    "UST35": "3.5 Üst: maçta toplam en az 4 gol olur.",
-    "ALT35": "3.5 Alt: maçta toplam en fazla 3 gol olur.",
+    "UST15": "Toplam gol 1.5 Üst: maçta toplam en az 2 gol olur.",
+    "ALT15": "Toplam gol 1.5 Alt: maçta toplam en fazla 1 gol olur.",
+    "UST25": "Toplam gol 2.5 Üst: maçta toplam en az 3 gol olur.",
+    "ALT25": "Toplam gol 2.5 Alt: maçta toplam en fazla 2 gol olur.",
+    "UST35": "Toplam gol 3.5 Üst: maçta toplam en az 4 gol olur.",
+    "ALT35": "Toplam gol 3.5 Alt: maçta toplam en fazla 3 gol olur.",
     "KGVAR": "Karşılıklı gol var: iki takım da en az birer gol atar.",
     "KGYOK": "Karşılıklı gol yok: takımlardan en az biri gol atamaz.",
-    "EVUST05": "Ev sahibi 0.5 Üst: ev sahibi en az 1 gol atar.",
-    "EVALT05": "Ev sahibi 0.5 Alt: ev sahibi gol atamaz.",
-    "EVUST15": "Ev sahibi 1.5 Üst: ev sahibi en az 2 gol atar.",
-    "EVALT15": "Ev sahibi 1.5 Alt: ev sahibi en fazla 1 gol atar.",
-    "DEPUST05": "Deplasman 0.5 Üst: deplasman takımı en az 1 gol atar.",
-    "DEPALT05": "Deplasman 0.5 Alt: deplasman takımı gol atamaz.",
-    "DEPUST15": "Deplasman 1.5 Üst: deplasman takımı en az 2 gol atar.",
-    "DEPALT15": "Deplasman 1.5 Alt: deplasman takımı en fazla 1 gol atar.",
+    "EVUST05": "Ev sahibi golleri 0.5 Üst: sadece ev sahibinin golleri sayılır; ev sahibi en az 1 gol atar.",
+    "EVALT05": "Ev sahibi golleri 0.5 Alt: sadece ev sahibinin golleri sayılır; ev sahibi gol atamaz.",
+    "EVUST15": "Ev sahibi golleri 1.5 Üst: sadece ev sahibinin golleri sayılır; ev sahibi en az 2 gol atar.",
+    "EVALT15": "Ev sahibi golleri 1.5 Alt: sadece ev sahibinin golleri sayılır; ev sahibi en fazla 1 gol atar.",
+    "DEPUST05": "Deplasman golleri 0.5 Üst: sadece deplasman takımının golleri sayılır; deplasman takımı en az 1 gol atar.",
+    "DEPALT05": "Deplasman golleri 0.5 Alt: sadece deplasman takımının golleri sayılır; deplasman takımı gol atamaz.",
+    "DEPUST15": "Deplasman golleri 1.5 Üst: sadece deplasman takımının golleri sayılır; deplasman takımı en az 2 gol atar.",
+    "DEPALT15": "Deplasman golleri 1.5 Alt: sadece deplasman takımının golleri sayılır; deplasman takımı en fazla 1 gol atar.",
 }
 
 MARKET_SECTIONS = [

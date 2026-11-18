@@ -65,6 +65,15 @@ def local_time(dt) -> str:
     return dt.astimezone(TZ).strftime("%H:%M")
 
 
+def local_iso(s) -> str:
+    """İş raporlarındaki ISO zaman metnini Türkiye saatiyle yazar (saat dilimi yoksa UTC sayılır)."""
+    try:
+        d = datetime.fromisoformat(str(s))
+    except ValueError:
+        return str(s)
+    return local_dt(d if d.tzinfo else d.replace(tzinfo=UTC))
+
+
 def signed_pct(v) -> str:
     if v is None:
         return "–"
@@ -73,12 +82,12 @@ def signed_pct(v) -> str:
 
 def make_templates() -> Jinja2Templates:
     t = Jinja2Templates(directory=str(WEB_DIR / "templates"))
-    t.env.filters.update(pct=pct, odds=odds_fmt, tl=tl, local_dt=local_dt, local_time=local_time,
+    t.env.filters.update(pct=pct, odds=odds_fmt, tl=tl, local_dt=local_dt, local_iso=local_iso, local_time=local_time,
                          local_date=local_date, local_day=local_day, signed_pct=signed_pct)
-    from app.model.markets import MARKET_HELP, MARKET_LABELS, MARKET_SECTIONS
+    from app.model.markets import MARKET_HELP, MARKET_LABELS, MARKET_SECTIONS, market_label
     static = WEB_DIR / "static"
     asset_v = str(int(max((static / f).stat().st_mtime for f in ("app.css", "app.js"))))  # önbellek kırıcı
-    t.env.globals.update(AUTH_ON=lambda: bool(site_password()), ASSET_V=asset_v, MARKET_LABELS=MARKET_LABELS, MARKET_HELP=MARKET_HELP, MARKET_SECTIONS=MARKET_SECTIONS,
+    t.env.globals.update(AUTH_ON=lambda: bool(site_password()), ASSET_V=asset_v, MARKET_LABELS=MARKET_LABELS, market_label=market_label, MARKET_HELP=MARKET_HELP, MARKET_SECTIONS=MARKET_SECTIONS,
                          ROLES=ROLES, LEVELS=list(LEVELS))
     return t
 

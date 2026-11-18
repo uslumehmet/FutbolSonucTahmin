@@ -29,7 +29,7 @@
   </div>
   {% if probs %}
     {% set big = true %}{% include "partials/_pbar.html" %}
-    <div class="pbar-legend"><span>Ev sahibi kazanır</span><span>Beraberlik</span><span>Deplasman kazanır</span></div>
+    <div class="pbar-legend"><span>1: {{ m.home_team.name }} kazanır</span><span>X: beraberlik</span><span>2: {{ m.away_team.name }} kazanır</span></div>
   {% endif %}
   {% if m.status == 'finished' and pred %}<p style="margin-top:.75rem"><b>Sonuç: {{ m.home_goals }}–{{ m.away_goals }}</b></p>{% endif %}
   {% if pred and pred.flags %}<p style="margin-top:.75rem">{% for f in pred.flags %}<span class="flag {% if f == 'eşleşmedi' %}warn{% endif %}">{{ f }}</span> {% endfor %}</p>{% endif %}

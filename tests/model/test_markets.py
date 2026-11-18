@@ -68,4 +68,14 @@ def test_pick_wins_extra_markets(market, h, a, exp):
 def test_labels_and_groups_cover_all_markets():
     from app.model.markets import MARKET_GROUP, MARKET_LABELS, MARKETS
     assert len(MARKETS) == 22 and set(MARKETS) == set(MARKET_LABELS) == set(MARKET_GROUP)
-    assert MARKET_LABELS["DEPUST15"] == "Deplasman 1.5 Üst" and MARKET_LABELS["EVUST15"] == "Ev sahibi 1.5 Üst"
+    assert MARKET_LABELS["DEPUST15"] == "Deplasman golleri 1.5 Üst" and MARKET_LABELS["EVUST15"] == "Ev sahibi golleri 1.5 Üst"
+    assert MARKET_LABELS["ALT15"] == "Toplam gol 1.5 Alt"
+
+
+def test_market_label_uses_team_names():
+    from app.model.markets import market_label
+    assert market_label("EVALT15", "Galler", "Portekiz") == "Galler golleri 1.5 Alt"
+    assert market_label("DEPUST05", "Galler", "Portekiz") == "Portekiz golleri 0.5 Üst"
+    assert market_label("ALT35", "Galler", "Portekiz") == "Toplam gol 3.5 Alt"
+    assert market_label("MS2", "Galler", "Portekiz") == "MS 2 (Portekiz kazanır)"
+    assert market_label("EVALT15") == "Ev sahibi golleri 1.5 Alt"

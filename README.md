@@ -6,7 +6,7 @@ Futbol maçlarının nasıl biteceğini istatistik ve makine öğrenmesiyle tahm
 
 ## Neler yapar
 
-- **Maçlar:** Her maç için 1-X-2 ihtimal çubuğu, 2.5 Üst ve karşılıklı gol ihtimali. Önümüzdeki 7 günün maçları sezon fikstüründen gelir; oranlar ve eksik oyuncular maçtan bir gün önce eklenir.
+- **Maçlar:** Her maç için 1-X-2 ihtimal çubuğu, toplam gol 1.5/2.5 Üst, karşılıklı gol ve iki takımın ayrı ayrı 1.5 Üst ihtimali. Önümüzdeki 7 günün maçları sezon fikstüründen gelir; oranlar ve eksik oyuncular maçtan bir gün önce eklenir.
 - **Maç detayı:** 22 tahmin türü (maç sonucu, çifte şans, 1.5/2.5/3.5 alt-üst, karşılıklı gol, ev sahibi ve deplasman golleri). Ayrıca tahminin gerekçesi, iki takımın son maçları, aralarındaki maçlar ve sakat ya da cezalı oyuncular.
 - **Kupon oluştur:** Hedef orana (2, 3, 5, 10) göre tutma ihtimali en yüksek seçimleri birleştirir. İki mod var:
   - **Güvenli:** ihtimali en yüksek seçim.

@@ -95,14 +95,16 @@ def test_market_help_tooltips_and_legend(client_seeded):
 
 def test_match_list_shows_extra_lines(client_seeded):
     lst = client_seeded.get("/?gun=3gun").text
-    for label in ("1.5 Üst", "Ev 1.5 Üst", "Dep 1.5 Üst"):
+    for label in ("Toplam 1.5 Üst", "Ev golleri 1.5 Üst", "Dep. golleri 1.5 Üst"):
         assert label in lst
 
 
 def test_detail_markets_grouped(client_seeded):
     det = client_seeded.get(f"/mac/{client_seeded.match_ids[0]}").text
-    for title in ("Maç sonucu", "Çifte şans", "Toplam gol", "Karşılıklı gol", "Ev sahibi golleri", "Deplasman golleri"):
+    for title in ("Maç sonucu", "Çifte şans", "Toplam gol", "Karşılıklı gol", "golleri (ev sahibi)", "golleri (deplasman)"):
         assert title in det
+    # toplam gol ve tek takımın golleri karışmasın: satırlarda çıplak "1.5 Alt" yok
+    assert "Toplam gol 1.5 Alt" in det and ">1.5 Alt<" not in det
 
 
 def test_recent_matches_explain_score_and_result_letters(client_seeded):

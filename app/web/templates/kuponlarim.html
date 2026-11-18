@@ -19,7 +19,7 @@
 <p class="autoplay-status soft"><small>
   {% if ap.ran_today %}Sistemin bugünkü otomatik oyunu {{ ap.at|local_time }}'de yapıldı:
     {% if ap.coupons %}{{ ap.coupons }} kupon, {{ ap.singles }} tekli.{% else %}uygun maç yoktu, kupon oynanmadı.{% endif %}
-  {% elif ap.before_hour %}Sistemin bugünkü otomatik oyunu 11:00'de yapılır.
+  {% elif ap.before_hour %}Sistemin bugünkü otomatik oyunu 11:00 civarında yapılır.
   {% else %}Sistemin bugünkü otomatik oyunu henüz yapılmadı; ilk fırsatta, başlamamış maçlarla yapılır.{% endif %}
   {% if ap.next_day and (not ap.ran_today or not ap.coupons) %} Sıradaki maçlar: {{ ap.next_day.kickoff|local_day }} ({{ ap.next_day.count }} maç).{% endif %}
 </small></p>
@@ -33,7 +33,7 @@
   <div class="stat"><small>Tutan / sonuçlanan</small><b>{{ stats.won }} / {{ stats.played }}</b></div>
   <div class="stat"><small>Açık kupon</small><b>{{ stats.open }}</b></div>
 </div>
-{% if not bets %}<div class="empty">Bu kasada kupon yok.{% if current.owner == 'user' %} <a href="/kupon">Kupon oluşturun</a>.{% else %} Sistem her gün 11:00'de oynar.{% endif %}</div>{% endif %}
+{% if not bets %}<div class="empty">Bu kasada kupon yok.{% if current.owner == 'user' %} <a href="/kupon">Kupon oluşturun</a>.{% else %} Sistem her gün 11:00 civarında oynar.{% endif %}</div>{% endif %}
 <div class="slips">
   {% for b in bets %}{% set c = b.coupon %}
   <article class="slip {{ c.mode }}">
@@ -42,7 +42,7 @@
     <div class="line">
       <span>{{ p.match.home_team.name }} – {{ p.match.away_team.name }}
         {% if p.match.status == 'finished' %}<small class="soft">({{ p.match.home_goals }}–{{ p.match.away_goals }})</small>{% endif %}</span>
-      <span><b>{{ MARKET_LABELS[p.market] }}</b> <small class="soft">{{ p.prob|pct }}</small></span>
+      <span><b>{{ market_label(p.market, p.match.home_team.name, p.match.away_team.name) }}</b> <small class="soft">{{ p.prob|pct }}</small></span>
       <span class="r-{{ p.result }}">{{ p.odds|odds }} {{ {'pending': '', 'won': '✓', 'lost': '✗', 'void': 'iptal'}[p.result] }}</span>
     </div>
     {% endfor %}

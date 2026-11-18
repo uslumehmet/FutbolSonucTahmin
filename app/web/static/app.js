@@ -186,3 +186,9 @@
   document.querySelectorAll('details').forEach(prepare);
   document.addEventListener('htmx:afterSwap', e => e.target.querySelectorAll && e.target.querySelectorAll('details').forEach(prepare));
 })();
+
+// Geri alınamayan işlemlerden (kasa silme, sıfırlama) önce onay iste.
+document.addEventListener('submit', (e) => {
+  const msg = e.target.getAttribute && e.target.getAttribute('data-confirm');
+  if (msg && !window.confirm(msg)) e.preventDefault();
+}, true);

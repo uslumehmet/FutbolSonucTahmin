@@ -252,7 +252,7 @@ label.check input { width: 1.05rem; height: 1.05rem; accent-color: var(--accent)
 .pbar .a { background: var(--away); color: #1f1300; }
 .pbar.big { height: 44px; font-size: 1.15rem; }
 .pbar-legend { display: flex; justify-content: space-between; font-size: .85rem; color: var(--ink-soft); margin-top: .2rem; }
-.minis { display: flex; gap: 1rem; font-size: .9rem; color: var(--ink-soft); margin-top: .25rem; }
+.minis { display: flex; flex-wrap: wrap; gap: .2rem 1rem; font-size: .9rem; color: var(--ink-soft); margin-top: .25rem; }
 .minis b { color: var(--ink); font-weight: 600; }
 
 .pick { display: inline-flex; gap: .35rem; align-items: baseline; padding: .15rem .55rem; border-radius: 999px;

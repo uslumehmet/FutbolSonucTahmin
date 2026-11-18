@@ -12,7 +12,7 @@ from app.config import TZ, get_settings
 from app.model.explain import explain
 from app.model.features import head_to_head, recent_matches
 from app.model.injuries import MissingImpact
-from app.model.markets import MARKET_LABELS, MARKETS
+from app.model.markets import MARKETS, market_label
 from app.model.predict import latest_prediction, repredict
 from app.models import Competition, Match, MissingPlayer, Team
 
@@ -137,7 +137,7 @@ def match_detail(session, match_id: int, now: datetime) -> dict | None:
         if key not in probs:
             continue
         o = odds.get(key)
-        markets.append({"key": key, "label": MARKET_LABELS[key], "prob": probs[key], "odds": o,
+        markets.append({"key": key, "label": market_label(key, m.home_team.name, m.away_team.name), "prob": probs[key], "odds": o,
                         "implied": implied.get(key), "value": probs[key] * o - 1 if o else None})
     before = min(now, m.kickoff_utc)
     home, away = m.home_team, m.away_team
@@ -162,7 +162,9 @@ def match_detail(session, match_id: int, now: datetime) -> dict | None:
     by_key = {x["key"]: x for x in markets}
     from app.model.markets import MARKET_SECTIONS
     sections = [(title, [by_key[k] for k in keys if k in by_key]) for title, keys in MARKET_SECTIONS]
-    sections = [(t, rows) for t, rows in sections if rows]
+    team_titles = {"Ev sahibi golleri": f"{m.home_team.name} golleri (ev sahibi)",
+                   "Deplasman golleri": f"{m.away_team.name} golleri (deplasman)"}
+    sections = [(team_titles.get(t, t), rows) for t, rows in sections if rows]
     return {"m": m, "pred": pred, "probs": probs, "markets": markets, "picks": pk, "form": form, "h2h": h2h,
             "sections": sections, "h2h_rows": h2h_rows(session, home.id, away.id, before, 6),
             "odds_time": odds_time,
