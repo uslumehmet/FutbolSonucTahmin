@@ -20,8 +20,8 @@
       <td>{{ owner_labels[w.owner] }}</td>
       <td class="num">{{ w.start_balance|tl }}</td>
       <td class="num"><b>{{ w.balance|tl }}</b></td>
-      <td class="num {% if st.net > 0 %}pos{% endif %}">{{ st.net|tl }}</td>
-      <td class="num">{{ st.roi|signed_pct if st.played else '–' }}</td>
+      <td class="num {% if st.net > 0 %}pos{% elif st.net < 0 %}loss{% endif %}">{{ st.net|tl }}</td>
+      <td class="num {% if st.played and st.roi is not none %}{% if (st.roi * 100)|round > 0 %}pos{% elif (st.roi * 100)|round < 0 %}loss{% endif %}{% endif %}">{{ st.roi|signed_pct if st.played else '–' }}</td>
       <td>{% if w.owner == 'user' %}<small>tutarı siz girersiniz</small>{% else %}
         <form class="inline-form" style="margin:0" method="post" action="/kasalar/{{ w.id }}/kural">
           <select name="kural" aria-label="Tutar kuralı"><option value="percent" {% if w.stake_rule == 'percent' %}selected{% endif %}>bakiyenin %'si</option><option value="fixed" {% if w.stake_rule == 'fixed' %}selected{% endif %}>sabit ₺</option></select>

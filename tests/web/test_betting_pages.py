@@ -165,3 +165,20 @@ def test_kuponlarim_shows_autoplay_status(client_seeded):
         wid = s.query(Wallet).filter(Wallet.owner == "safe").first().id
     html = client_seeded.get(f"/kuponlarim?kasa={wid}").text
     assert "uygun maç yoktu" in html and "Sıradaki maçlar" in html
+
+
+def test_negative_net_shown_red(client_seeded, session_factory):
+    from datetime import date
+
+    from app.models import Bet, Coupon
+    w = _user_wallet(session_factory)
+    with session_factory() as s:
+        c = Coupon(mode="safe", source="user", target_odds=2.0, total_odds=2.0, prob=0.5, status="lost",
+                   play_date=date(2026, 11, 16))
+        s.add(c)
+        s.flush()
+        s.add(Bet(wallet_id=w.id, coupon_id=c.id, stake=1000, payout=0))
+        s.commit()
+    kas = client_seeded.get("/kasalar").text
+    assert 'class="num loss">' in kas  # eksi net kırmızı
+    assert 'class="loss">' in client_seeded.get(f"/kuponlarim?kasa={w.id}").text

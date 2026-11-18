@@ -2,7 +2,7 @@
 {% block title %}Performans · FutbolSonuçTahmin{% endblock %}
 {% macro unit_row(label, u) -%}
 <tr><td>{{ label }}</td><td class="num">{{ u.coupons }}</td><td class="num">{{ u.won }}</td>
-  <td class="num">{{ u.hit|pct }}</td><td class="num {% if u.unit_roi is not none and u.unit_roi > 0 %}pos{% endif %}">{{ u.unit_roi|signed_pct }}</td></tr>
+  <td class="num">{{ u.hit|pct }}</td><td class="num {% if u.unit_roi is not none %}{% if (u.unit_roi * 100)|round > 0 %}pos{% elif (u.unit_roi * 100)|round < 0 %}loss{% endif %}{% endif %}">{{ u.unit_roi|signed_pct }}</td></tr>
 {%- endmacro %}
 {% macro unit_head() -%}
 <tr><th></th><th class="num">Sonuçlanan</th><th class="num">Tutan</th><th class="num">İsabet</th><th class="num">Birim ROI</th></tr>
@@ -40,7 +40,7 @@
       <span>Başlangıç <b>{{ w.start_balance|tl }}</b></span>
       <span>Kullanılabilir bakiye <b>{{ w.balance|tl }}</b></span>
       <span>Açık kuponlarda <b>{{ (value - w.balance)|tl }}</b> ({{ st.open }})</span>
-      <span title="Kazanılan paranın kuponlara yatırılan toplam paraya oranı (kasanın başlangıcına göre değil)">Yatırılana göre getiri <b>{{ st.roi|signed_pct if st.played else '–' }}</b></span>
+      <span title="Kazanılan paranın kuponlara yatırılan toplam paraya oranı (kasanın başlangıcına göre değil)">Yatırılana göre getiri <b class="{% if st.played and st.roi is not none %}{% if (st.roi * 100)|round > 0 %}pos{% elif (st.roi * 100)|round < 0 %}loss{% endif %}{% endif %}">{{ st.roi|signed_pct if st.played else '–' }}</b></span>
       <span>En büyük düşüş <b>{{ st.max_drawdown|tl }}</b></span>
     </div>
   </div>
@@ -58,7 +58,7 @@
     <div class="kpis">
       <div class="kpi"><span>Sonuçlanan</span><b>{{ ms.coupons }}</b></div>
       <div class="kpi"><span>İsabet</span><b>{{ ms.hit|pct }}</b></div>
-      <div class="kpi"><span>Birim ROI</span><b class="{% if ms.unit_roi is not none and ms.unit_roi > 0 %}pos{% endif %}">{{ ms.unit_roi|signed_pct }}</b></div>
+      <div class="kpi"><span>Birim ROI</span><b class="{% if ms.unit_roi is not none %}{% if (ms.unit_roi * 100)|round > 0 %}pos{% elif (ms.unit_roi * 100)|round < 0 %}loss{% endif %}{% endif %}">{{ ms.unit_roi|signed_pct }}</b></div>
     </div>
     <p class="soft" style="margin:0"><small>Açık kupon: {{ ms.open }}</small></p>
     <details class="sub"><summary>Hedef orana göre</summary>

@@ -283,6 +283,7 @@ th { font-weight: 600; color: var(--ink-soft); font-size: .88rem; }
 td.num, th.num { text-align: right; white-space: nowrap; }
 .pos { color: var(--good); font-weight: 600; }
 .neg { color: var(--ink-soft); }
+.loss { color: var(--bad); font-weight: 600; }  /* zarar: eksi net, eksi getiri */
 .form { display: inline-flex; gap: 3px; }
 .form i { width: 22px; height: 22px; display: inline-grid; place-items: center; font-style: normal; font-size: .75rem;
   font-weight: 600; border-radius: 5px; color: #fff; }

@@ -29,7 +29,7 @@
 <div class="stats">
   <div class="stat"><small>Bakiye</small><b>{{ current.balance|tl }}</b></div>
   <div class="stat"><small>Başlangıç</small><b>{{ current.start_balance|tl }}</b></div>
-  <div class="stat"><small>Net</small><b class="{% if stats.net > 0 %}pos{% endif %}">{{ stats.net|tl }}</b></div>
+  <div class="stat"><small>Net</small><b class="{% if stats.net > 0 %}pos{% elif stats.net < 0 %}loss{% endif %}">{{ stats.net|tl }}</b></div>
   <div class="stat"><small>Tutan / sonuçlanan</small><b>{{ stats.won }} / {{ stats.played }}</b></div>
   <div class="stat"><small>Açık kupon</small><b>{{ stats.open }}</b></div>
 </div>
