@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Kuponlarım · FutbolSonuçTahmin{% endblock %}
+{% block content %}
+<h1>Kuponlarım</h1>
+{% if not wallets %}<div class="empty">Henüz kasa yok. <a href="/kasalar">Kasa açın</a>.</div>{% else %}
+<div class="toolbar">
+  <label>Kasa
+    <select onchange="location.href='/kuponlarim?kasa=' + this.value + '&durum={{ durum }}'">
+      {% for w in wallets %}<option value="{{ w.id }}" {% if current and w.id == current.id %}selected{% endif %}>{{ w.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <div class="seg" role="group" aria-label="Durum">
+    {% for key, label in [('hepsi', 'Hepsi'), ('acik', 'Açık'), ('sonuc', 'Sonuçlanan')] %}
+    <a href="/kuponlarim?kasa={{ current.id }}&durum={{ key }}" {% if durum == key %}aria-current="true"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </div>
+</div>
+{% if current %}{% set ap = autoplay %}
+<p class="autoplay-status soft"><small>
+  {% if ap.ran_today %}Sistemin bugünkü otomatik oyunu {{ ap.at|local_time }}'de yapıldı:
+    {% if ap.coupons %}{{ ap.coupons }} kupon, {{ ap.singles }} tekli.{% else %}uygun maç yoktu, kupon oynanmadı.{% endif %}
+  {% elif ap.before_hour %}Sistemin bugünkü otomatik oyunu 11:00'de yapılır.
+  {% else %}Sistemin bugünkü otomatik oyunu henüz yapılmadı; ilk fırsatta, başlamamış maçlarla yapılır.{% endif %}
+  {% if ap.next_day and (not ap.ran_today or not ap.coupons) %} Sıradaki maçlar: {{ ap.next_day.kickoff|local_day }} ({{ ap.next_day.count }} maç).{% endif %}
+</small></p>
+{% endif %}
+{% if current %}
+<h2>{{ current.name }} {% if current.busted %}<span class="wallet-busted">battı</span>{% endif %}</h2>
+<div class="stats">
+  <div class="stat"><small>Bakiye</small><b>{{ current.balance|tl }}</b></div>
+  <div class="stat"><small>Başlangıç</small><b>{{ current.start_balance|tl }}</b></div>
+  <div class="stat"><small>Net</small><b class="{% if stats.net > 0 %}pos{% endif %}">{{ stats.net|tl }}</b></div>
+  <div class="stat"><small>Tutan / sonuçlanan</small><b>{{ stats.won }} / {{ stats.played }}</b></div>
+  <div class="stat"><small>Açık kupon</small><b>{{ stats.open }}</b></div>
+</div>
+{% if not bets %}<div class="empty">Bu kasada kupon yok.{% if current.owner == 'user' %} <a href="/kupon">Kupon oluşturun</a>.{% else %} Sistem her gün 11:00'de oynar.{% endif %}</div>{% endif %}
+<div class="slips">
+  {% for b in bets %}{% set c = b.coupon %}
+  <article class="slip {{ c.mode }}">
+    <h3><span class="status {{ c.status }}">{{ status_labels[c.status] }}</span> <small class="soft">{{ 'Güvenli' if c.mode == 'safe' else 'Değerli' }}, hedef {{ '%g'|format(c.target_odds) }}, {{ b.placed_at|local_dt }}</small></h3>
+    {% for p in c.picks %}
+    <div class="line">
+      <span>{{ p.match.home_team.name }} – {{ p.match.away_team.name }}
+        {% if p.match.status == 'finished' %}<small class="soft">({{ p.match.home_goals }}–{{ p.match.away_goals }})</small>{% endif %}</span>
+      <span><b>{{ MARKET_LABELS[p.market] }}</b> <small class="soft">{{ p.prob|pct }}</small></span>
+      <span class="r-{{ p.result }}">{{ p.odds|odds }} {{ {'pending': '', 'won': '✓', 'lost': '✗', 'void': 'iptal'}[p.result] }}</span>
+    </div>
+    {% endfor %}
+    <div class="sum"><span>Oran {{ c.total_odds|odds }}</span><span>Tutar {{ b.stake|tl }}</span></div>
+    <p>{% if b.payout is none %}Olası kazanç {{ (b.stake * c.total_odds)|round|int|tl }}{% else %}Ödeme <b>{{ b.payout|tl }}</b>{% endif %}
+      <br><small class="soft">Kuponun tutma ihtimali {{ c.prob|pct }}</small></p>
+  </article>
+  {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

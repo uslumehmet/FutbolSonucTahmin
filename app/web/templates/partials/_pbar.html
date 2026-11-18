@@ -1,0 +1,6 @@
+{%- set p1 = probs.get('MS1', 0) %}{% set px = probs.get('MSX', 0) %}{% set p2 = probs.get('MS2', 0) -%}
+<div class="pbar{% if big %} big{% endif %}" role="img" aria-label="Ev sahibi {{ p1|pct }}, beraberlik {{ px|pct }}, deplasman {{ p2|pct }}">
+  <span class="h" style="width: {{ (p1 * 100)|round(1) }}%">{% if p1 >= 0.12 %}1 {{ p1|pct }}{% endif %}</span>
+  <span class="d" style="width: {{ (px * 100)|round(1) }}%">{% if px >= 0.12 %}X {{ px|pct }}{% endif %}</span>
+  <span class="a" style="width: {{ (p2 * 100)|round(1) }}%">{% if p2 >= 0.12 %}2 {{ p2|pct }}{% endif %}</span>
+</div>

@@ -1,0 +1,10 @@
+<details class="panel" style="margin-top:1rem">
+  <summary><b>Bahis türleri ne demek?</b></summary>
+  <p class="soft"><small>Bütün bahisler 90 dakika ve uzatma dakikalarıyla değerlendirilir; uzatma devreleri ve penaltılar sayılmaz.</small></p>
+  <div class="table-wrap"><table>
+    {% for title, keys in MARKET_SECTIONS %}
+    <tr class="section-row"><th colspan="2">{{ title }}</th></tr>
+    {% for k in keys %}<tr><td style="white-space:nowrap">{{ MARKET_LABELS[k] }}</td><td>{{ MARKET_HELP[k] }}</td></tr>{% endfor %}
+    {% endfor %}
+  </table></div>
+</details>

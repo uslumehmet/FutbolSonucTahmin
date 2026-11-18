@@ -1,0 +1,36 @@
+# --- Gizli bilgiler: ASLA depoya girmez ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets*
+
+# --- Yerel veri: veritabanı, indirilen veriler, eğitilmiş modeller, kayıtlar ---
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.log
+*.joblib
+*.pkl
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Araç ve sistem dosyaları ---
+.superpowers/
+.claude/
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store

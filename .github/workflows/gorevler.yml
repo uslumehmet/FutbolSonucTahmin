@@ -1,0 +1,61 @@
+# Günlük işler: veri güncelleme, otomatik oyun, sonuçlandırma, haftalık yeniden eğitim.
+# Bilgisayar kapalıyken de çalışır. Saatler UTC'dir (Türkiye = UTC+3).
+# Her çalışma "zamanı gelmiş ne varsa" yapar (python -m app.cli catch-up); bir çalışma gecikirse sonraki tamamlar.
+name: Gunluk gorevler
+
+on:
+  schedule:
+    - cron: "7 6 * * *"    # 09:07  sonuçlandırma + günlük güncelleme (maçlar, oranlar, eksikler)
+    - cron: "7 8 * * *"    # 11:07  otomatik oyun
+    - cron: "37 9 * * *"   # 12:37  yedek: 11:07 gecikir ya da atlanırsa
+    - cron: "7 12 * * *"   # 15:07  sonuçlandırma
+    - cron: "7 17 * * *"   # 20:07  sonuçlandırma
+    - cron: "37 21 * * *"  # 00:37  sonuçlandırma
+  workflow_dispatch: {}    # Actions sekmesinden elle "Run workflow"
+
+concurrency:
+  group: gorevler
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write   # sadece aşağıdaki "iş akışını açık tut" adımı için
+
+jobs:
+  calistir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+          cache: pip
+
+      - name: Paketleri kur
+        run: pip install -r requirements.txt
+
+      - name: İndirilen veri önbelleği (openfootball, milli maçlar)
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: raw-${{ github.run_id }}
+          restore-keys: raw-
+
+      - name: Zamanı gelen işleri yap
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "DATABASE_URL secret'ı eksik (README: İnternete açma)"; exit 1; fi
+          python -m app.cli catch-up
+
+      # Public depolarda GitHub, 60 gün commit olmazsa zamanlanmış iş akışlarını kapatır.
+      # İş akışını her gün yeniden "açık" işaretlemek bu sayacı sıfırlar.
+      - name: İş akışını açık tut
+        if: github.event_name == 'schedule'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/gorevler.yml/enable"

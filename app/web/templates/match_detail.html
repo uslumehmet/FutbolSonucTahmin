@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}{{ m.home_team.name }} – {{ m.away_team.name }} · FutbolSonuçTahmin{% endblock %}
+{% macro formstrip(rows) -%}
+<span class="form" aria-label="Form">{% for r in rows[:5]|reverse %}<i class="{{ r.result }}" data-tip="{{ r.opponent }}: {{ r.gf }}–{{ r.ga }} ({{ {'G': 'galibiyet', 'B': 'beraberlik', 'M': 'mağlubiyet'}[r.result] }})">{{ r.result }}</i>{% endfor %}</span>
+{%- endmacro %}
+{% macro matchlist(rows) -%}
+{% if rows %}
+<div class="table-wrap"><table>
+  <tr><th>Tarih</th><th>Rakip</th><th>Yer</th><th class="num">Atılan–yenen</th><th>Sonuç</th></tr>
+  {% for r in rows %}
+  <tr><td>{{ r.kickoff_utc|local_date }}</td><td>{{ r.opponent }}</td><td><small>{{ {'E': 'ev', 'D': 'dep.', 'T': 'tarafsız'}[r.venue] }}</small></td>
+    <td class="num">{{ r.gf }}–{{ r.ga }}</td><td><span class="form"><i class="{{ r.result }}">{{ r.result }}</i></span></td></tr>
+  {% endfor %}
+</table></div>
+{% else %}<p class="soft">Kayıtlı maç yok.</p>{% endif %}
+{%- endmacro %}
+{% block content %}
+<p><a href="/">Maçlara dön</a></p>
+<section class="match-head">
+  <small>{{ m.competition.name }} · {{ m.kickoff_utc|local_dt }}</small>
+  <div class="scoreline">
+    <div class="team">{{ m.home_team.name }}</div>
+    <div class="xg">
+      {% if pred and pred.lam_home is not none %}{{ '%.2f'|format(pred.lam_home) }} – {{ '%.2f'|format(pred.lam_away) }}<small>Gol beklentisi</small>
+      {% elif m.status == 'finished' %}{{ m.home_goals }} – {{ m.away_goals }}<small>Maç sonucu</small>
+      {% else %}–<small>Tahmin yok</small>{% endif %}
+    </div>
+    <div class="team away">{{ m.away_team.name }}</div>
+  </div>
+  {% if probs %}
+    {% set big = true %}{% include "partials/_pbar.html" %}
+    <div class="pbar-legend"><span>Ev sahibi kazanır</span><span>Beraberlik</span><span>Deplasman kazanır</span></div>
+  {% endif %}
+  {% if m.status == 'finished' and pred %}<p style="margin-top:.75rem"><b>Sonuç: {{ m.home_goals }}–{{ m.away_goals }}</b></p>{% endif %}
+  {% if pred and pred.flags %}<p style="margin-top:.75rem">{% for f in pred.flags %}<span class="flag {% if f == 'eşleşmedi' %}warn{% endif %}">{{ f }}</span> {% endfor %}</p>{% endif %}
+  {% if m.unmatched %}<div class="notice error" style="margin-top:.75rem">Takımlardan biri geçmiş verideki bir takımla eşleşmedi, bu yüzden tahmin yapılmadı. <a href="/ayarlar#eslestirme">Ayarlar'dan eşleştirin</a>.</div>{% endif %}
+</section>
+
+<div class="grid2">
+  <section class="panel">
+    <h2>Bahis seçenekleri</h2>
+    {% if markets %}
+    <div class="table-wrap"><table>
+      <tr><th>Seçim</th><th class="num">Tutma ihtimali</th><th class="num">Oran</th><th class="num">Piyasa</th><th class="num">Değer</th></tr>
+      {% for title, rows in sections %}
+      <tr class="section-row"><th colspan="5">{{ title }}</th></tr>
+      {% for x in rows %}
+      <tr data-market="{{ x.key }}" data-prob="{{ (x.prob * 100)|round|int }}">
+        <td><span class="help" data-tip="{{ MARKET_HELP[x.key] }}" tabindex="0" aria-label="{{ x.label }}: {{ MARKET_HELP[x.key] }}">{{ x.label }}</span>
+          {% if picks.safe and picks.safe.market == x.key %}<span class="pick safe">Güvenli</span>{% endif %}
+          {% if picks.value and picks.value.market == x.key %}<span class="pick value">Değerli</span>{% endif %}</td>
+        <td class="num"><b>{{ x.prob|pct }}</b></td>
+        <td class="num">{{ x.odds|odds }}</td>
+        <td class="num"><small>{{ x.implied|pct }}</small></td>
+        <td class="num {% if x.value is not none and x.value > 0 %}pos{% else %}neg{% endif %}">{{ x.value|signed_pct }}</td>
+      </tr>
+      {% endfor %}
+      {% endfor %}
+    </table></div>
+    <p class="soft" style="margin-top:.6rem"><small>Değer = tutma ihtimali × oran − 1. Pozitif değer, oranın modelin ihtimaline göre yüksek olduğu anlamına gelir.{% if picks.book == 'AVG' %} Bet365 oranı yok, bahisçi ortalaması kullanıldı.{% endif %}
+      <br>Oranların alındığı zaman: {{ odds_time|local_dt if odds_time else 'oran yok' }} ({{ 'Bet365' if picks.book == 'B365' else 'bahisçi ortalaması' }}). Oranlar canlı değildir; her sabah güncellenir.</small></p>
+    {% else %}<p class="soft">Bu maç için tahmin yok.</p>{% endif %}
+  </section>
+  <section class="panel">
+    <h2>Neden?</h2>
+    {% if lines %}<ul class="reasons">{% for l in lines %}<li>{{ l }}</li>{% endfor %}</ul>{% else %}<p class="soft">Gerekçe için tahmin gerekli.</p>{% endif %}
+    {% if pred and pred.top_scores %}
+    <h3 style="margin-top:1rem">En olası skorlar</h3>
+    <table>{% for s in pred.top_scores %}<tr><td>{{ s[0] }}–{{ s[1] }}</td><td class="num">{{ s[2]|pct }}</td></tr>{% endfor %}</table>
+    {% endif %}
+  </section>
+</div>
+
+<section class="panel" id="eksikler">
+  <h2>Eksik oyuncular</h2>
+  {% if missing %}
+  <div class="table-wrap"><table>
+    <tr><th>Takım</th><th>Oyuncu</th><th>Neden</th><th>Etkisi</th><th></th></tr>
+    {% for x in missing %}
+    <tr {% if not x.mp.active %}class="soft"{% endif %}>
+      <td>{{ x.team }}</td><td>{{ x.mp.player_name }}</td>
+      <td>{{ x.mp.reason or (x.mp.role ~ ', ' ~ x.mp.level if x.mp.source == 'manual' else '') }}{% if x.mp.source == 'manual' %} <small>(elle)</small>{% endif %}</td>
+      <td>{% if x.impact.attack_effect >= 0.05 %}hücum: yüksek{% elif x.impact.attack_effect > 0 %}hücum: düşük{% endif %}
+          {% if x.impact.concede_effect >= 0.03 %} savunma: yüksek{% elif x.impact.concede_effect > 0 %} savunma: düşük{% endif %}
+          {% if x.impact.attack_effect == 0 and x.impact.concede_effect == 0 %}<small>bilinmiyor</small>{% endif %}</td>
+      <td><form method="post" action="/mac/{{ m.id }}/eksik/{{ x.mp.id }}/kaldir">
+        <button class="linkbtn" type="submit">{% if x.mp.source == 'manual' %}Sil{% elif x.mp.active %}Yok say{% else %}Geri al{% endif %}</button></form></td>
+    </tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="soft">Kayıtlı eksik oyuncu yok.</p>{% endif %}
+  {% if m.status == 'scheduled' %}
+  <form class="inline-form" method="post" action="/mac/{{ m.id }}/eksik">
+    <label>Takım <select name="team_id"><option value="{{ m.home_team_id }}">{{ m.home_team.name }}</option><option value="{{ m.away_team_id }}">{{ m.away_team.name }}</option></select></label>
+    <label>Oyuncu <input type="text" name="player_name" required maxlength="80" size="14"></label>
+    <label>Rol <select name="role">{% for r in ROLES %}<option>{{ r }}</option>{% endfor %}</select></label>
+    <label>Önemi <select name="level">{% for l in LEVELS %}<option {% if l == 'orta' %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
+    <button class="btn small" type="submit">Eksik ekle</button>
+  </form>
+  {% endif %}
+  <p style="margin-top:.75rem"><small>Sakatlık haberlerine kendiniz bakmak için: <a href="{{ tm_home }}" target="_blank" rel="noopener">{{ m.home_team.name }} (Transfermarkt)</a> · <a href="{{ tm_away }}" target="_blank" rel="noopener">{{ m.away_team.name }} (Transfermarkt)</a></small></p>
+</section>
+
+<h2>Son maçlar</h2>
+<p class="soft"><small>Her takımın kendi maçları; skor o takımın gözünden yazılır (atılan–yenen). G: galibiyet, B: beraberlik, M: mağlubiyet.</small></p>
+<div class="grid2">
+  <section class="panel"><h3>{{ m.home_team.name }} {{ formstrip(form.home_all) }}</h3>
+    <details open><summary>Tüm maçlar</summary>{{ matchlist(form.home_all) }}</details>
+    <details><summary>Sadece iç saha</summary>{{ matchlist(form.home_venue) }}</details></section>
+  <section class="panel"><h3>{{ m.away_team.name }} {{ formstrip(form.away_all) }}</h3>
+    <details open><summary>Tüm maçlar</summary>{{ matchlist(form.away_all) }}</details>
+    <details><summary>Sadece deplasman</summary>{{ matchlist(form.away_venue) }}</details></section>
+</div>
+<section class="panel"><h2>Aralarındaki maçlar</h2>
+  <p class="soft"><small>İki takımın birbirleriyle oynadığı son maçlar. Kadrolar her sezon değiştiği için tahminde az ağırlığı var.</small></p>
+  {% if h2h_rows %}
+  <div class="table-wrap"><table class="h2h">
+    <tr><th>Tarih</th><th>Maç (ev sahibi – deplasman)</th><th class="num">Skor</th><th>Kazanan</th></tr>
+    {% for r in h2h_rows %}
+    <tr><td>{{ r.date|local_date }}</td><td>{{ r.home }} – {{ r.away }}</td><td class="num"><b>{{ r.hg }}–{{ r.ag }}</b></td>
+      <td>{% if r.winner %}{{ r.winner }}{% else %}Berabere{% endif %}</td></tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="soft">Kayıtlı maç yok.</p>{% endif %}
+</section>
+{% include "partials/_market_help.html" %}
+{% endblock %}

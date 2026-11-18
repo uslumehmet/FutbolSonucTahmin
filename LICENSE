@@ -1,0 +1,20 @@
+FutbolSonuçTahmin
+Telif hakkı (c) 2026 Mehmet Uslu. Tüm hakları saklıdır.
+
+Bu deponun kaynak kodu incelemek ve öğrenmek amacıyla herkese açık olarak yayımlanmıştır.
+
+İzin verilenler:
+- Kodu okumak ve incelemek.
+- Kişisel ve ticari olmayan amaçla kendi bilgisayarınıza indirip çalıştırmak.
+
+Geliştiricinin yazılı izni olmadan yasak olanlar:
+- Kodun tamamını ya da bir bölümünü kopyalayıp başka bir yerde yayımlamak veya dağıtmak.
+- Kodu değiştirerek kendi ürününüz gibi yayımlamak.
+- Kodu satmak, kiralamak ya da herhangi bir ticari amaçla kullanmak.
+
+Üçüncü taraf kütüphaneler (app/web/static/vendor/) kendi lisanslarıyla dağıtılır;
+ayrıntı app/web/static/vendor/LISANSLAR.md dosyasındadır.
+
+YAZILIM "OLDUĞU GİBİ" SUNULUR. AÇIK YA DA ÖRTÜLÜ HİÇBİR GÜVENCE VERİLMEZ. Yazılımın ürettiği
+ihtimaller ve tahminler gerçek sonuç değildir. Yazılımın kullanımından doğan doğrudan ya da dolaylı
+hiçbir kayıptan geliştirici sorumlu tutulamaz.

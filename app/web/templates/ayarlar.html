@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Ayarlar · FutbolSonuçTahmin{% endblock %}
+{% block content %}
+<h1>Ayarlar</h1>
+
+<section class="panel">
+  <h2>API-Football</h2>
+  <p>Bugün kullanılan istek: <b>{{ used }} / {{ limit }}</b>. Bu ay API'den gelen veri: <b>{{ '%.1f'|format(month_mb) }} MB</b>.</p>
+  <form class="inline-form" method="post" action="/ayarlar/anahtar">
+    <label>API anahtarı <input type="password" name="api_key" placeholder="{{ key_hint or 'dashboard.api-football.com adresinden alın' }}" size="36" autocomplete="off"></label>
+    <button class="btn" type="submit">Kaydet</button>
+  </form>
+  {% if key_hint %}<p class="soft" style="margin-top:.5rem"><small>Kayıtlı anahtar: {{ key_hint }}</small></p>
+  <form method="post" action="/ayarlar/probe" style="margin-top:.5rem"><button class="btn light" type="submit">Ücretsiz planın kapsamını dene</button>
+    <small class="soft">yaklaşık 6–8 istek harcar</small></form>{% endif %}
+  {% if probe %}
+  <table style="margin-top:.75rem">{% for k, v in probe.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Seçim ve kupon kuralları</h2>
+  <form method="post" action="/ayarlar">
+    <div class="inline-form">
+      <label>Güvenli seçimde en düşük oran <input type="text" name="safe_min_odds" value="{{ s.safe_min_odds }}" size="5"></label>
+      <label>Değerli seçimde en düşük ihtimal <input type="text" name="value_min_prob" value="{{ s.value_min_prob }}" size="5"></label>
+      <label>Değerli seçimde en düşük değer <input type="text" name="value_min_edge" value="{{ s.value_min_edge }}" size="5"></label>
+    </div>
+    <div class="inline-form">
+      <label>Kuponda en fazla maç <input type="number" name="coupon_max_picks" value="{{ s.coupon_max_picks }}" min="1" max="10" style="width:5rem"></label>
+      <label>Toplam oran üst sınırı (hedef ×) <input type="text" name="coupon_upper_factor" value="{{ s.coupon_upper_factor }}" size="5"></label>
+      <label>Otomatik oyun hedefleri <input type="text" name="autoplay_targets" value="{{ s.autoplay_targets|join(', ') }}" size="12"></label>
+    </div>
+    <div class="inline-form">
+      <label>Oran düzeltme (%) <input type="text" name="odds_adjust_pct" value="{{ s.odds_adjust_pct }}" size="5"></label>
+      <label>Model–piyasa farkı üst sınırı <input type="text" name="max_model_gap" value="{{ s.max_model_gap }}" size="5"></label>
+      <label>Günlük API sınırı <input type="number" name="api_daily_limit" value="{{ s.api_daily_limit }}" min="1" style="width:6rem"></label>
+    </div>
+    <div class="inline-form">
+      <input type="hidden" name="safe_skip_low_data_sent" value="1">
+      <label class="check"><input type="checkbox" name="safe_skip_low_data" value="1" {% if s.safe_skip_low_data %}checked{% endif %}>
+        Verisi az maçları Güvenli moda alma</label>
+      <small class="soft">Lige yeni çıkan ya da geçmişi az olan takımların maçları ("veri az" etiketi). Değerli modu etkilemez.</small>
+    </div>
+    <p class="soft"><small>Oran düzeltme: Türkiye'deki oranlar genelde Bet365'ten düşüktür. Örneğin −8 girerseniz bütün oranlar %8 düşürülerek hesaplanır. Değerler 0,40 = %40 biçimindedir. Model–piyasa farkı: modelin ihtimali piyasanınkinden bu kadar fazla yüksekse seçim kupona girmez (büyük fark genelde model hatasıdır).</small></p>
+    <button class="btn" type="submit">Ayarları kaydet</button>
+  </form>
+</section>
+
+<section class="panel" id="eslestirme">
+  <h2>Eşleşmeyen takımlar</h2>
+  {% if unmatched %}
+  <p class="soft">Bu takımlar geçmiş verideki bir takımla otomatik eşleşmedi. Eşleşene kadar maçları tahmin edilmez ve kupona girmez.</p>
+  {% for u in unmatched %}
+  <form class="inline-form" method="post" action="/ayarlar/eslestir">
+    <input type="hidden" name="temp_id" value="{{ u.team.id }}">
+    <span><b>{{ u.team.name }}</b> <small class="soft">({{ u.competition.name }})</small></span>
+    <select name="hedef">
+      <option value="yeni">Ligi yeni çıktı (yeni takım)</option>
+      {% for t in u.candidates %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+    </select>
+    <button class="btn small" type="submit">Eşleştir</button>
+  </form>
+  {% endfor %}
+  {% else %}<p class="soft">Eşleşmeyen takım yok.</p>{% endif %}
+</section>
+
+<section class="panel">
+  <h2>Son işler</h2>
+  <table>
+    <tr><td>Veri güncelleme</td><td>{% if last_update %}{{ last_update.at[:16]|replace('T', ' ') }} UTC: {{ last_update.fixtures }} maç, {{ last_update.odds }} oran, {{ last_update.missing }} eksik
+      {% for f in last_update.fallbacks %}<br><small>{{ f }}</small>{% endfor %}{% for e in last_update.errors[:5] %}<br><small class="soft">{{ e }}</small>{% endfor %}{% else %}henüz yok{% endif %}</td></tr>
+    <tr><td>Otomatik oyun</td><td>{% if last_autoplay %}{{ last_autoplay.at[:16]|replace('T', ' ') }} UTC: {{ last_autoplay.coupons }} kupon, {{ last_autoplay.singles }} tekli
+      {% for k in last_autoplay.skipped %}<br><small class="soft">{{ k }}</small>{% endfor %}{% else %}henüz yok{% endif %}</td></tr>
+    <tr><td>Sonuçlandırma</td><td>{% if last_settle %}{{ last_settle.at[:16]|replace('T', ' ') }} UTC: {{ last_settle.coupons }} kupon, {{ last_settle.bets }} bahis{% else %}henüz yok{% endif %}</td></tr>
+  </table>
+</section>
+{% endblock %}

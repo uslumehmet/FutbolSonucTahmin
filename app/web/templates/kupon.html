@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Kupon oluştur · FutbolSonuçTahmin{% endblock %}
+{% block content %}
+<h1>Kupon oluştur</h1>
+<p class="soft">Sistem, seçtiğiniz hedef orana uyan seçimler arasından kuponun tutma ihtimalini en yüksek yapan kombinasyonu kurar. Her maçtan en fazla bir seçim alınır.</p>
+<form class="panel" method="post" action="/kupon/olustur" hx-post="/kupon/olustur" hx-target="#sonuc" hx-swap="innerHTML">
+  <div class="toolbar">
+    <div>
+      <div><b>Hedef oran</b></div>
+      <div class="seg" role="radiogroup" aria-label="Hedef oran">
+        {% for t in targets %}<label><input type="radio" name="hedef" value="{{ t }}" {% if t == 3 %}checked{% endif %}><span>{{ t }}</span></label>{% endfor %}
+      </div>
+    </div>
+    <div>
+      <div><b>Mod</b></div>
+      <div class="seg" role="radiogroup" aria-label="Mod">
+        <label><input type="radio" name="mod" value="safe" checked><span>Güvenli</span></label>
+        <label><input type="radio" name="mod" value="value"><span>Değerli</span></label>
+      </div>
+    </div>
+    <div>
+      <div><b>Zaman</b></div>
+      <div class="seg" role="radiogroup" aria-label="Zaman">
+        {% for key, label in day_labels.items() %}<label><input type="radio" name="gun" value="{{ key }}" {% if key == '3gun' %}checked{% endif %}><span>{{ label }}</span></label>{% endfor %}
+      </div>
+    </div>
+    <fieldset style="border:0;padding:0;margin:0">
+      <legend><b>Ligler</b></legend>
+      {% if leagues %}
+        {% for code, name, n in leagues %}<label style="display:block"><input type="checkbox" name="lig" value="{{ code }}"> {{ name }} ({{ n }} maç)</label>{% endfor %}
+      {% else %}<small class="soft">Şu an oranı olan maç yok. Oranlar her sabah 10:30'da gelir;<br>ücretsiz plan yalnızca bugünün ve yarının maçlarını verir.</small>{% endif %}
+    </fieldset>
+  </div>
+  <p class="soft"><small><b>Güvenli</b>: tutma ihtimali en yüksek seçimler. <b>Değerli</b>: ihtimali yüksek ve oranı hak ettiğinden fazla olan seçimler. Hiçbir lig işaretlemezseniz hepsi dahil.</small></p>
+  <button class="btn" type="submit">Kupon oluştur</button>
+</form>
+<div id="sonuc">{% if result %}{% with coupons=result.coupons, reason=result.reason, wallets=result.wallets, mode=result.mode %}{% include "partials/_coupons.html" %}{% endwith %}{% endif %}</div>
+{% endblock %}

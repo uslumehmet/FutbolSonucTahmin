@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Giriş · FutbolSonuçTahmin{% endblock %}
+{% block content %}
+<section class="panel login-card">
+  <h1>Giriş</h1>
+  <p class="soft">Bu site kişiseldir. Devam etmek için şifreyi girin.</p>
+  {% if giris_hata %}<div class="notice error" role="alert">{{ giris_hata }}</div>{% endif %}
+  <form method="post" action="/giris" class="login-form">
+    <input type="hidden" name="sonra" value="{{ sonra }}">
+    <label for="sifre">Şifre</label>
+    <input id="sifre" type="password" name="sifre" autocomplete="current-password" required autofocus>
+    <button class="btn" type="submit">Giriş yap</button>
+  </form>
+  <p class="soft"><small>Bu cihazda 180 gün boyunca giriş açık kalır.</small></p>
+</section>
+{% endblock %}

@@ -1,0 +1,4 @@
+# Windows betikleri CRLF satır sonuyla kalmalı; yoksa cmd ve wscript bozuk çalışabilir.
+*.bat text eol=crlf
+*.vbs text eol=crlf
+* text=auto

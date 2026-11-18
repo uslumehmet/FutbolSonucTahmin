@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}Performans · FutbolSonuçTahmin{% endblock %}
+{% macro unit_row(label, u) -%}
+<tr><td>{{ label }}</td><td class="num">{{ u.coupons }}</td><td class="num">{{ u.won }}</td>
+  <td class="num">{{ u.hit|pct }}</td><td class="num {% if u.unit_roi is not none and u.unit_roi > 0 %}pos{% endif %}">{{ u.unit_roi|signed_pct }}</td></tr>
+{%- endmacro %}
+{% macro unit_head() -%}
+<tr><th></th><th class="num">Sonuçlanan</th><th class="num">Tutan</th><th class="num">İsabet</th><th class="num">Birim ROI</th></tr>
+{%- endmacro %}
+{% block content %}
+<h1>Performans</h1>
+<p class="soft">Kasaların nasıl gittiğini ve hangi modun işe yaradığını gösterir. Grafiğini görmek istediğiniz kasayı üstten seçin.</p>
+{% if not settled %}<div class="empty" style="margin-bottom:1.25rem">Henüz sonuçlanmış kupon yok. İlk sonuçlar maçlar bitince gelir; sistem her gün 11:00'de oynar.</div>{% endif %}
+
+<section class="panel chart-panel">
+  <div class="chart-head">
+    <h2>Kasa grafiği</h2>
+    <small class="soft">Kasa değeri = bakiye + açık kuponlardaki para</small>
+  </div>
+  <div class="wallet-tabs" role="tablist" aria-label="Kasa seçin">
+    {% for w, st in rows %}
+    {% set value = st.equity[-1][1] if st.equity else w.balance %}
+    {% set trend = 'up' if st.net > 0 else ('down' if st.net < 0 else 'flat') %}
+    <button class="wtab" type="button" role="tab" data-wallet="{{ w.id }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
+      <span class="wtab-name">{{ w.name }}</span>
+      <span class="wtab-val">{{ value|tl }} <i class="{{ trend }}">{% if st.net > 0 %}+{% endif %}{{ st.net|tl }}</i></span>
+    </button>
+    {% endfor %}
+  </div>
+  {% for w, st in rows %}
+  {% set value = st.equity[-1][1] if st.equity else w.balance %}
+  {% set trend = 'up' if st.net > 0 else ('down' if st.net < 0 else 'flat') %}
+  <div class="wsum" data-wallet="{{ w.id }}" {% if not loop.first %}hidden{% endif %}>
+    <div class="wsum-main">
+      <span class="wsum-value">{{ value|tl }}</span>
+      <span class="w-net {{ trend }}">{% if st.net > 0 %}▲ +{% elif st.net < 0 %}▼ {% endif %}{{ st.net|tl }}</span>
+      {% if w.busted %}<span class="wallet-busted">battı</span>{% endif %}
+    </div>
+    <div class="w-facts">
+      <span>Başlangıç <b>{{ w.start_balance|tl }}</b></span>
+      <span>Kullanılabilir bakiye <b>{{ w.balance|tl }}</b></span>
+      <span>Açık kuponlarda <b>{{ (value - w.balance)|tl }}</b> ({{ st.open }})</span>
+      <span>Getiri <b>{{ st.roi|signed_pct if st.played else '–' }}</b></span>
+      <span>En büyük düşüş <b>{{ st.max_drawdown|tl }}</b></span>
+    </div>
+  </div>
+  {% endfor %}
+  <div class="chartbox"><canvas id="kasaChart" aria-label="Seçili kasanın değeri zaman içinde"></canvas></div>
+  <p class="soft" style="margin:.5rem 0 0"><small>Kasa adlarını <a href="/kasalar">Kasalar</a> sayfasından değiştirebilir, yeni kasa açabilirsiniz; yeni kasa burada kendiliğinden görünür.</small></p>
+</section>
+
+<h2>Modlar</h2>
+<p class="soft"><small>Karşılaştırma her kupona 1 birim yatırılmış gibi yapılır; kasaların büyüklüğü sonucu değiştirmez.</small></p>
+<div class="mode-cards">
+  {% for mode, label in [('safe', 'Güvenli'), ('value', 'Değerli')] %}{% set ms = modes[mode] %}
+  <section class="panel mode-card {{ mode }}">
+    <h3>{{ label }} mod</h3>
+    <div class="kpis">
+      <div class="kpi"><span>Sonuçlanan</span><b>{{ ms.coupons }}</b></div>
+      <div class="kpi"><span>İsabet</span><b>{{ ms.hit|pct }}</b></div>
+      <div class="kpi"><span>Birim ROI</span><b class="{% if ms.unit_roi is not none and ms.unit_roi > 0 %}pos{% endif %}">{{ ms.unit_roi|signed_pct }}</b></div>
+    </div>
+    <p class="soft" style="margin:0"><small>Açık kupon: {{ ms.open }}</small></p>
+    <details class="sub"><summary>Hedef orana göre</summary>
+      <div class="table-wrap"><table>{{ unit_head() }}
+        {{ unit_row('Tüm kuponlar', ms) }}
+        {% for t, u in ms.by_target.items() %}{{ unit_row('%g'|format(t) ~ ' oranlı', u) }}{% endfor %}
+        {% for r in singles[mode].total %}{{ unit_row('Tekli seçimler', {'coupons': r.n, 'won': r.won, 'hit': r.hit, 'unit_roi': r.unit_roi}) }}{% endfor %}
+      </table></div>
+    </details>
+    {% if singles[mode].market %}
+    <details class="sub"><summary>Tekliler: bahis türüne göre</summary><div class="table-wrap"><table>{{ unit_head() }}
+      {% for r in singles[mode].market %}{{ unit_row(MARKET_LABELS.get(r.key, r.key), {'coupons': r.n, 'won': r.won, 'hit': r.hit, 'unit_roi': r.unit_roi}) }}{% endfor %}</table></div></details>
+    <details class="sub"><summary>Tekliler: lige göre</summary><div class="table-wrap"><table>{{ unit_head() }}
+      {% for r in singles[mode].league %}{{ unit_row(r.key, {'coupons': r.n, 'won': r.won, 'hit': r.hit, 'unit_roi': r.unit_roi}) }}{% endfor %}</table></div></details>
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
+
+<details class="panel" style="margin-top:.5rem">
+  <summary><h2>Model ayrıntıları</h2><small class="soft" style="margin-left:auto">canlı kalibrasyon, geçmiş test, makine öğrenmesi</small></summary>
+
+  <h3 style="margin-top:1rem">Canlı kalibrasyon</h3>
+  <p class="soft"><small>Model bir olasılık söylediğinde gerçekte ne kadar oldu? İyi bir modelde iki sütun birbirine yakındır.</small></p>
+  <div class="grid2">
+    {% for g, label in group_labels.items() %}
+    <div><h3>{{ label }}</h3>
+      {% if calib[g] %}<table><tr><th>Söylenen</th><th class="num">Gerçekleşen</th><th class="num">Maç</th></tr>
+        {% for b in calib[g] %}<tr><td>{{ b[0]|pct }}</td><td class="num">{{ b[1]|pct }}</td><td class="num">{{ b[2] }}</td></tr>{% endfor %}</table>
+      {% else %}<p class="soft">Henüz sonuçlanmış tahmin yok.</p>{% endif %}</div>
+    {% endfor %}
+  </div>
+
+  <h3 style="margin-top:1.25rem">Geçmiş test</h3>
+  {% if bt %}
+  <p>{{ bt.seasons|join(', ') }} sezonları, {{ bt.n_matches }} maç. Her maç yalnızca o güne kadarki verilerle tahmin edildi.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Pazar</th><th class="num">İsabet</th><th class="num">Log-loss (model)</th><th class="num">Log-loss (basit tahmin)</th><th class="num">Kalibrasyon hatası</th></tr>
+    {% for g, v in bt.groups.items() %}
+    <tr><td>{{ group_labels.get(g, g) }}</td><td class="num">{{ v.accuracy|pct }}</td><td class="num">{{ '%.3f'|format(v.model_ll) }}</td>
+      <td class="num">{{ '%.3f'|format(v.base_ll) }}</td><td class="num">{{ v.ece|pct }}</td></tr>
+    {% endfor %}
+  </table></div>
+  <p class="soft"><small>Log-loss düşük olan daha iyidir. "Basit tahmin", her maça ligin ortalama ev/beraberlik/deplasman oranlarını veren tahmindir.</small></p>
+  <h3>Model emin olduğunda ne oldu?</h3>
+  <table><tr><th>Modelin en olası seçimi</th><th class="num">Maç</th><th class="num">Ortalama söylenen</th><th class="num">Tuttu</th></tr>
+    {% for r in bt.confidence %}<tr><td>en az {{ r.min_prob|pct }}</td><td class="num">{{ r.n }}</td><td class="num">{{ r.avg_prob|pct }}</td><td class="num">{{ r.hit|pct }}</td></tr>{% endfor %}</table>
+  <ul class="reasons" style="margin-top:.75rem">{% for n in bt.notes %}<li><small>{{ n }}</small></li>{% endfor %}</ul>
+  {% else %}<p class="soft">Geçmiş test henüz çalıştırılmadı (<code>python -m app.cli backtest</code>).</p>{% endif %}
+
+  <h3 style="margin-top:1.25rem">Makine öğrenmesi katmanı</h3>
+  <table><tr><th>Pazar</th><th>Durum</th><th class="num">Katman 1 log-loss</th><th class="num">Katman 2 log-loss</th></tr>
+  {% for g, label in group_labels.items() %}{% set mt = l2_metrics.get(g, {}) %}
+    <tr><td>{{ label }}</td><td>{{ 'açık' if l2_active.get(g) else 'kapalı' }}</td>
+      <td class="num">{{ '%.4f'|format(mt.l1_ll) if mt.l1_ll is defined else '–' }}</td><td class="num">{{ '%.4f'|format(mt.l2_ll) if mt.l2_ll is defined else '–' }}</td></tr>
+  {% endfor %}</table>
+  <p class="soft"><small>Katman 2 yalnızca testte tahmini iyileştirdiyse açık kalır; haftada bir yeniden eğitilir.</small></p>
+</details>
+{% endblock %}
+{% block scripts %}
+<script src="/static/vendor/chart.umd.min.js"></script>
+<script>
+(function () {
+  const series = {{ series_json|safe }};
+  const byId = Object.fromEntries(series.map(s => [String(s.id), s]));
+  const months = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+  const DAY = 86400000;
+  const fmtDay = v => { const d = new Date(v); return d.getDate() + ' ' + months[d.getMonth()]; };
+  const fmtTl = v => v.toLocaleString('tr-TR', {maximumFractionDigits: 2}) + ' ₺';
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const tabs = [...document.querySelectorAll('.wtab')];
+  const canvas = document.getElementById('kasaChart');
+  if (!canvas || !tabs.length) return;
+  let chart = null, current = null;
+
+  function lineColor(s) {
+    const last = s.data.length ? s.data[s.data.length - 1].y : s.start;
+    return last < s.start ? css('--bad') : css('--accent');
+  }
+  function fill(color) {
+    return ctx => {
+      const area = ctx.chart.chartArea;
+      if (!area) return 'transparent';
+      const g = ctx.chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+      g.addColorStop(0, color + '55');
+      g.addColorStop(1, color + '00');
+      return g;
+    };
+  }
+  function datasets(s) {
+    const c = lineColor(s);
+    const first = s.data.length ? s.data[0].x : 0, last = s.data.length ? s.data[s.data.length - 1].x : 0;
+    return [
+      {label: s.label, data: s.data, borderColor: c, backgroundColor: fill(c), fill: 'start', borderWidth: 2.5,
+       tension: 0.35, cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: c},
+      {label: 'Başlangıç', data: [{x: first, y: s.start}, {x: last, y: s.start}], borderColor: css('--ink-soft'),
+       borderDash: [5, 5], borderWidth: 1, pointRadius: 0, fill: false}
+    ];
+  }
+  function bounds(s) {
+    return s.data.length ? {min: s.data[0].x, max: s.data[s.data.length - 1].x} : {min: undefined, max: undefined};
+  }
+  function build(s) {
+    const ink = css('--ink-soft');
+    chart = new Chart(canvas, {
+      type: 'line', data: {datasets: datasets(s)},
+      options: {
+        responsive: true, maintainAspectRatio: false, parsing: false,
+        animation: {duration: 700, easing: 'easeOutQuart'},
+        interaction: {mode: 'index', intersect: false},
+        scales: {
+          x: {type: 'linear', ...bounds(s), grid: {display: false}, border: {display: false},
+              ticks: {color: ink, callback: fmtDay, maxTicksLimit: 7, stepSize: DAY},
+              afterBuildTicks: axis => {
+                const seen = new Set();
+                axis.ticks = axis.ticks.filter(tk => { const k = fmtDay(tk.value); if (seen.has(k)) return false; seen.add(k); return true; });
+              }},
+          y: {grid: {color: css('--rule')}, border: {display: false}, ticks: {color: ink, callback: fmtTl, maxTicksLimit: 5}, grace: '10%'}
+        },
+        plugins: {legend: {display: false},
+          tooltip: {callbacks: {title: items => fmtDay(items[0].parsed.x), label: it => it.dataset.label + ': ' + fmtTl(it.parsed.y)}}}
+      }
+    });
+  }
+  function select(id, save) {
+    const s = byId[id];
+    if (!s) return;
+    current = id;
+    tabs.forEach(t => t.setAttribute('aria-selected', t.dataset.wallet === id ? 'true' : 'false'));
+    document.querySelectorAll('.wsum').forEach(el => { el.hidden = el.dataset.wallet !== id; });
+    if (!chart) build(s);
+    else {
+      chart.data.datasets = datasets(s);
+      Object.assign(chart.options.scales.x, bounds(s));
+      chart.update();
+    }
+    if (save) { try { localStorage.setItem('kasa', id); } catch (e) {} }
+  }
+  tabs.forEach(t => t.addEventListener('click', () => select(t.dataset.wallet, true)));
+  let saved = null;
+  try { saved = localStorage.getItem('kasa'); } catch (e) {}
+  select(saved && byId[saved] ? saved : tabs[0].dataset.wallet, false);
+  // Tema değişince grafik yeni renklerle yeniden çizilir
+  document.addEventListener('temadegisti', () => setTimeout(() => { chart.destroy(); chart = null; select(current, false); }, 460));
+})();
+</script>
+{% endblock %}

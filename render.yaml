@@ -1,0 +1,23 @@
+# Render "Blueprint" dosyası: siteyi ücretsiz planda çalıştırır.
+# Günlük işler burada değil, GitHub Actions'ta çalışır (.github/workflows/gorevler.yml);
+# ücretsiz Render sunucusu 15 dakika kullanılmayınca uyur, ilk açılış 30–60 saniye sürebilir.
+services:
+  - type: web
+    name: futbol-sonuc-tahmin
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.web.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /saglik
+    envVars:
+      - key: BAHIS_NO_SCHEDULER
+        value: "1"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false   # Neon bağlantı adresi; Render panelinde elle girilir
+      - key: SITE_PASSWORD
+        sync: false   # siteye giriş şifresi; Render panelinde elle girilir
+      - key: API_FOOTBALL_KEY
+        sync: false

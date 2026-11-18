@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Maçlar · FutbolSonuçTahmin{% endblock %}
+{% block content %}
+<h1>Maçlar</h1>
+<form class="toolbar" method="get" action="/">
+  <div class="seg" role="group" aria-label="Gün">
+    {% for key, label in day_labels.items() %}
+    <a href="/?gun={{ key }}{% if lig %}&lig={{ lig }}{% endif %}" {% if gun == key %}aria-current="true"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </div>
+  <input type="hidden" name="gun" value="{{ gun }}">
+  <label>Lig
+    <select name="lig" onchange="this.form.submit()">
+      <option value="">Tümü</option>
+      {% for c in comps %}<option value="{{ c.code }}" {% if lig == c.code %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+  </label>
+  {% if last %}<small>Son güncelleme: {{ last.at[:16]|replace('T', ' ') }} UTC</small>{% endif %}
+</form>
+
+{% if not groups %}
+<div class="empty">
+  <p>Bu aralıkta maç yok.</p>
+  {% if next_day %}
+  <p>Sıradaki maçlar: <b>{{ next_day.kickoff|local_day }}</b> ({{ next_day.count }} maç). <a href="/?gun=7gun{% if lig %}&lig={{ lig }}{% endif %}">7 günlük listeye bakın</a>.</p>
+  <p class="soft"><small>Oranlar ve eksik oyuncular maçtan bir gün önce gelir; ücretsiz API planı yalnızca dünü, bugünü ve yarını gösteriyor.</small></p>
+  {% elif not has_api_key %}<p>Yaklaşan maçlar için API anahtarı gerekiyor.</p>{% endif %}
+</div>
+{% endif %}
+
+{% for g in groups %}
+<section class="league" aria-labelledby="lg-{{ g.competition.code }}">
+  <h2 id="lg-{{ g.competition.code }}">{{ g.competition.name }} <small>{{ g.rows|length }} maç</small></h2>
+  {% for r in g.rows %}
+  <a class="mrow" href="/mac/{{ r.m.id }}">
+    <div class="time">{{ r.m.kickoff_utc|local_time }}<br><small>{{ r.m.kickoff_utc|local_day }}</small></div>
+    <div class="teams">
+      <b>{{ r.m.home_team.name }}</b>
+      <b>{{ r.m.away_team.name }}</b>
+      {% if r.m.status == 'finished' %}<small>Bitti: {{ r.m.home_goals }}–{{ r.m.away_goals }}</small>
+      {% elif r.m.status != 'scheduled' %}<small>{{ {'postponed': 'Ertelendi', 'cancelled': 'İptal', 'abandoned': 'Yarıda kaldı'}[r.m.status] }}</small>{% endif %}
+    </div>
+    <div class="probs">
+      {% if r.probs %}
+        {% set probs = r.probs %}{% set big = false %}{% include "partials/_pbar.html" %}
+        <div class="minis">
+          {% for key, short in [('UST15', '1.5 Üst'), ('UST25', '2.5 Üst'), ('KGVAR', 'KG Var'), ('EVUST15', 'Ev 1.5 Üst'), ('DEPUST15', 'Dep 1.5 Üst')] %}
+          {% if key in r.probs %}<span class="help" data-tip="{{ MARKET_HELP[key] }}">{{ short }} <b>{{ r.probs[key]|pct }}</b></span>{% endif %}
+          {% endfor %}
+        </div>
+      {% else %}<small>Tahmin yok</small>{% endif %}
+    </div>
+    <div class="extra">
+      {% if r.picks.safe %}<span class="pick safe" data-tip="Güvenli seçim: tutma ihtimali en yüksek bahis. {{ MARKET_HELP[r.picks.safe.market] }}">Güvenli <b>{{ MARKET_LABELS[r.picks.safe.market] }}</b> {{ r.picks.safe.odds|odds }} · {{ r.picks.safe.prob|pct }}</span>{% endif %}
+      {% if r.picks.value %}<span class="pick value" data-tip="Değerli seçim: oranı, modelin ihtimaline göre yüksek olan bahis. {{ MARKET_HELP[r.picks.value.market] }}">Değerli <b>{{ MARKET_LABELS[r.picks.value.market] }}</b> {{ r.picks.value.odds|odds }} · {{ r.picks.value.prob|pct }}</span>
+      {% elif r.picks.cands %}<span class="flag">değerli seçim yok</span>{% endif %}
+      {% if r.picks.book == 'AVG' %}<span class="flag">oranlar ort.</span>{% endif %}
+      {% if r.missing %}<span class="flag">{{ r.missing }} eksik</span>{% endif %}
+      {% for f in r.flags %}<span class="flag {% if f in ('eşleşmedi', 'oran yok') %}warn{% endif %}"{% if f == 'oran 1 gün önce gelir' %} data-tip="Bu maç sezon fikstüründen geldi; saat değişebilir. Oranlar ve eksik oyuncular maçtan bir gün önce API-Football'dan gelir, kupon da o zaman kurulabilir." tabindex="0"{% endif %}>{{ f }}</span>{% endfor %}
+    </div>
+  </a>
+  {% endfor %}
+</section>
+{% endfor %}
+{% include "partials/_market_help.html" %}
+{% endblock %}

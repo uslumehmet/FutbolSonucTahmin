@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}FutbolSonuçTahmin{% endblock %}</title>
+  <meta name="description" content="Futbol maç sonucu tahmini: istatistik ve makine öğrenmesi modelleriyle hesaplanan ihtimaller.">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css?v={{ ASSET_V }}">
+  <script>
+    // Tema, sayfa çizilmeden önce ayarlanır (beyaz parlama olmasın): kayıtlı seçim, yoksa sistem ayarı.
+    (function () {
+      var d = document.documentElement, t = null;
+      d.classList.add('js');
+      try { t = localStorage.getItem('tema'); } catch (e) {}
+      if (t !== 'dark' && t !== 'light') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      d.setAttribute('data-theme', t);
+    })();
+  </script>
+  <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/app.js?v={{ ASSET_V }}" defer></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <a class="skip" href="#icerik">İçeriğe geç</a>
+  <header class="topbar">
+    <div class="inner">
+      <a class="brand" href="/" aria-label="FutbolSonuçTahmin, ana sayfa">
+        <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+          <defs><linearGradient id="bm-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs>
+          <rect x="1" y="1" width="38" height="38" rx="11" fill="url(#bm-grad)"/>
+          <circle cx="20" cy="20" r="12.5" fill="none" stroke="#fff" stroke-width="2.4"/>
+          <path d="M20 13.2l5.6 4.1-2.1 6.6h-7l-2.1-6.6z" fill="#fff"/>
+          <path d="M20 13.2V7.6M25.6 17.3l5.3-1.7M23.5 23.9l3.3 4.5M16.5 23.9l-3.3 4.5M14.4 17.3l-5.3-1.7" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="brand-text">
+          <span class="brand-name">Futbol<span class="brand-accent">Sonuç</span>Tahmin</span>
+          <span class="brand-tag">İstatistik ve makine öğrenmesiyle maç tahmini</span>
+        </span>
+      </a>
+      <button class="theme-toggle" type="button" aria-label="Koyu temaya geç" title="Tema değiştir">
+        <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="currentColor"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      {% if not login_page %}
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="ana-menu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Menü</span>
+      </button>
+      <nav class="nav" id="ana-menu" aria-label="Ana menü">
+        <a href="/" {% if nav == 'maclar' %}aria-current="page"{% endif %}>Maçlar</a>
+        <a href="/kupon" {% if nav == 'kupon' %}aria-current="page"{% endif %}>Kupon oluştur</a>
+        <a href="/kuponlarim" {% if nav == 'kuponlarim' %}aria-current="page"{% endif %}>Kuponlarım</a>
+        <a href="/performans" {% if nav == 'performans' %}aria-current="page"{% endif %}>Performans</a>
+        <a href="/kasalar" {% if nav == 'kasalar' %}aria-current="page"{% endif %}>Kasalar</a>
+        <a href="/ayarlar" {% if nav == 'ayarlar' %}aria-current="page"{% endif %}>Ayarlar</a>
+      </nav>
+      {% endif %}
+    </div>
+  </header>
+  <main id="icerik">
+    {% if not has_api_key %}
+    <div class="notice">API anahtarı girilmedi: yaklaşan maçlar, oranlar ve eksik oyuncular gelmez. <a href="/ayarlar">Ayarlar'dan ekleyin</a>.</div>
+    {% endif %}
+    {% if hata %}<div class="notice error" role="alert">{{ hata }}</div>{% endif %}
+    {% if mesaj %}<div class="notice ok" role="status">{{ mesaj }}</div>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="site-footer">
+    <div class="inner">
+      <span class="copy">© 2026 Mehmet Uslu</span>
+      <span class="footer-links">
+        {% if AUTH_ON() and not login_page %}<a class="footer-link" href="/cikis">Çıkış</a>{% endif %}
+        <a class="footer-link" href="#sorumluluk" data-modal="sorumluluk">Sorumluluk reddi</a>
+      </span>
+    </div>
+  </footer>
+  <dialog class="modal" id="sorumluluk" aria-labelledby="sorumluluk-baslik">
+    <div class="modal-body">
+    <div class="modal-head">
+      <h2 id="sorumluluk-baslik">Sorumluluk reddi</h2>
+      <form method="dialog"><button class="modal-x" type="submit" aria-label="Kapat">×</button></form>
+    </div>
+    <p>Bu sitedeki ihtimaller ve tahminler, geçmiş maç verileri üzerinde çalışan istatistik ve makine öğrenmesi modellerinin hesaplamasıdır; <b>gerçek sonuç değildir</b>. Hiçbir model bir maçın nasıl biteceğini önceden bilemez, her tahmin yanlış çıkabilir.</p>
+    <p>Gösterilen oranlar API-Football üzerinden alınan piyasa oranlarıdır ve her an değişebilir.</p>
+    <p>Kasalar sanaldır: site gerçek parayla oyun oynatmaz, para yatırma ya da çekme yoktur ve hiçbir şirketle bağlantısı yoktur.</p>
+    <p>Bu bilgilere dayanarak verdiğiniz kararların sorumluluğu tamamen size aittir; geliştirici hiçbir kayıptan sorumlu tutulamaz.</p>
+    <p class="soft"><small>Veri kaynakları: openfootball, martj42/international_results, API-Football.</small></p>
+    <form method="dialog" class="modal-foot"><button class="btn" type="submit">Anladım</button></form>
+    </div>
+  </dialog>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

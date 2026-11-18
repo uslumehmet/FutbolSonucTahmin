@@ -1,0 +1,26 @@
+{% if reason %}<div class="notice">{{ reason }}</div>{% endif %}
+{% if coupons %}
+<div class="slips">
+  {% for c in coupons %}
+  <article class="slip {{ c.mode }}">
+    <h3>{% if loop.first %}En iyi kupon{% else %}Alternatif {{ loop.index0 }}{% endif %} <small class="soft">{{ 'Güvenli' if c.mode == 'safe' else 'Değerli' }}, hedef {{ '%g'|format(c.target_odds) }}</small></h3>
+    {% for p in c.picks %}
+    <div class="line">
+      <span>{{ p.match.home_team.name }} – {{ p.match.away_team.name }}<br><small class="soft">{{ p.match.kickoff_utc|local_dt }}</small></span>
+      <span><b>{{ MARKET_LABELS[p.market] }}</b><br><small class="soft">{{ p.prob|pct }}</small></span>
+      <span class="num">{{ p.odds|odds }}</span>
+    </div>
+    {% endfor %}
+    <div class="sum"><span>Toplam oran</span><span>{{ c.total_odds|odds }}</span></div>
+    <p>Kuponun tutma ihtimali <b>{{ c.prob|pct }}</b><br><small class="soft">Beklenen getiri {{ (c.prob * c.total_odds - 1)|signed_pct }}</small></p>
+    {% if wallets %}
+    <form class="inline-form" method="post" action="/kupon/{{ c.id }}/oyna">
+      <label>Kasa <select name="wallet_id">{% for w in wallets %}<option value="{{ w.id }}">{{ w.name }} ({{ w.balance|tl }})</option>{% endfor %}</select></label>
+      <label>Tutar (₺) <input type="number" name="tutar" min="1" step="1" value="10" style="width:6rem"></label>
+      <button class="btn" type="submit">Oyna</button>
+    </form>
+    {% else %}<p class="soft">Oynamak için <a href="/kasalar">bir kasa açın</a>.</p>{% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% endif %}
