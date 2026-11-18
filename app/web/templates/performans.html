@@ -40,7 +40,7 @@
       <span>Başlangıç <b>{{ w.start_balance|tl }}</b></span>
       <span>Kullanılabilir bakiye <b>{{ w.balance|tl }}</b></span>
       <span>Açık kuponlarda <b>{{ (value - w.balance)|tl }}</b> ({{ st.open }})</span>
-      <span>Getiri <b>{{ st.roi|signed_pct if st.played else '–' }}</b></span>
+      <span title="Kazanılan paranın kuponlara yatırılan toplam paraya oranı (kasanın başlangıcına göre değil)">Yatırılana göre getiri <b>{{ st.roi|signed_pct if st.played else '–' }}</b></span>
       <span>En büyük düşüş <b>{{ st.max_drawdown|tl }}</b></span>
     </div>
   </div>
@@ -50,7 +50,7 @@
 </section>
 
 <h2>Modlar</h2>
-<p class="soft"><small>Karşılaştırma her kupona 1 birim yatırılmış gibi yapılır; kasaların büyüklüğü sonucu değiştirmez.</small></p>
+<p class="soft"><small>Karşılaştırma her kupona aynı tutar (1 birim) yatırılmış gibi yapılır; kasaların büyüklüğü sonucu değiştirmez. Kasalar ise her kupona bakiyenin yüzdesini yatırdığı için sonuçları farklı olabilir: kuponların tuttuğu gün tutar küçük, yattığı gün büyükse mod kârda görünürken kasa zararda olabilir.</small></p>
 <div class="mode-cards">
   {% for mode, label in [('safe', 'Güvenli'), ('value', 'Değerli')] %}{% set ms = modes[mode] %}
   <section class="panel mode-card {{ mode }}">
