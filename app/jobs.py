@@ -167,7 +167,11 @@ def catch_up(sf, now: datetime, settle: bool = True) -> list[str]:
     if settle:
         run("settle_job", settle_job)
     with sf() as s:
-        need_update = now.astimezone(TZ).hour >= UPDATE_FROM_HOUR and not _done_today(s, "update", now)
+        # Bugünün güncellemesi sabah UPDATE_FROM_HOUR'dan sonra yapılmış olmalı; gece yarısından sonra
+        # (ör. 00:16'da) yapılan güncelleme o günün oranları için sayılmaz.
+        morning = now.astimezone(TZ).replace(hour=UPDATE_FROM_HOUR, minute=0, second=0, microsecond=0)
+        need_update = now.astimezone(TZ).hour >= UPDATE_FROM_HOUR and not s.query(JobRun).filter(
+            JobRun.job == "update", JobRun.finished_at >= morning).first()
     if need_update:
         run("daily_update", daily_update)
     with sf() as s:

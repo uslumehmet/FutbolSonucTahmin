@@ -37,6 +37,16 @@ def test_catch_up_does_not_repeat_done_jobs(session_factory, monkeypatch):
     assert ran == ["settle_job"]
 
 
+def test_catch_up_redoes_update_made_after_midnight(session_factory, monkeypatch):
+    """Gece 00:16'daki güncelleme sabah oranlarının yerini tutmaz; 09:07'de yeniden yapılır."""
+    ran = _stub(monkeypatch)
+    with session_factory() as s:
+        s.add(JobRun(job="update", run_key="2026-11-18", finished_at=datetime(2026, 11, 18, 0, 16, tzinfo=TZ)))
+        s.commit()
+    jobs.catch_up(session_factory, datetime(2026, 11, 18, 9, 7, tzinfo=TZ))
+    assert "daily_update" in ran
+
+
 def test_scheduler_jobs_registered(session_factory):
     sched = jobs.create_scheduler(session_factory)
     ids = {j.id for j in sched.get_jobs()}
