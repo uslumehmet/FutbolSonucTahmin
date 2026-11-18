@@ -15,7 +15,7 @@
       {% for c in comps %}<option value="{{ c.code }}" {% if lig == c.code %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
     </select>
   </label>
-  {% if last %}<small>Son güncelleme: {{ last.at[:16]|replace('T', ' ') }} UTC</small>{% endif %}
+  {% if last %}<small>Son güncelleme: {{ last.at|local_iso }}</small>{% endif %}
 </form>
 
 {% if not groups %}

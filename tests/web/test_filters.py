@@ -17,3 +17,9 @@ def test_local_iso():
     from app.web.main import local_iso
     assert local_iso("2026-11-16T06:07:00+00:00") == "Pzt 16 Kas 09:07"
     assert local_iso("2026-11-16T06:07:00") == "Pzt 16 Kas 09:07"
+
+
+def test_signed_pct_no_negative_zero():
+    from app.web.main import signed_pct
+    assert signed_pct(-0.003) == "%0" and signed_pct(0.0) == "%0"
+    assert signed_pct(0.09) == "+%9" and signed_pct(-0.29) == "−%29"

@@ -77,7 +77,8 @@ def local_iso(s) -> str:
 def signed_pct(v) -> str:
     if v is None:
         return "–"
-    return f"{'+' if v >= 0 else '−'}%{abs(round(v * 100))}"
+    n = round(v * 100)  # işaret yuvarlanmış sayıya göre: −0,3 "−%0" değil "%0" yazılır
+    return "%0" if n == 0 else f"{'+' if n > 0 else '−'}%{abs(n)}"
 
 
 def make_templates() -> Jinja2Templates:
