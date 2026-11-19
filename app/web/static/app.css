@@ -331,7 +331,7 @@ tr.section-row th { background: var(--section); color: var(--ink); font-family: 
 .rename:focus-within button { display: inline-block; }
 
 /* ---------- kupon fişi ---------- */
-.slips { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.25rem; }
+.slips { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 1.25rem; align-items: start; }
 .slip { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-m); padding: 1rem;
   border-top: 4px solid var(--ink-soft); box-shadow: 0 1px 2px var(--shadow); }
 .slip.safe { border-top-color: var(--home); }
@@ -339,6 +339,49 @@ tr.section-row th { background: var(--section); color: var(--ink); font-family: 
 .slip .line { display: grid; grid-template-columns: 1fr auto auto; gap: .5rem; padding: .4rem 0; border-bottom: 1px dashed var(--rule); }
 .slip .line:last-of-type { border-bottom: 0; }
 .slip .sum { display: flex; justify-content: space-between; font-family: var(--head); font-weight: 600; font-size: 1.15rem; margin: .6rem 0; }
+
+/* Kuponlarım: sade kart. Her maç tıklanınca açılır (ne oldu, neden tuttu/tutmadı). */
+.slip-hint { margin: -.5rem 0 1rem; }
+.slip-head { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .6rem; margin-bottom: .5rem; }
+.slip-meta { font-weight: 600; font-size: .92rem; }
+.slip-time { margin-left: auto; font-size: .85rem; }
+.legs { display: flex; flex-direction: column; }
+.leg { border-top: 1px solid var(--rule); }
+.leg > summary { gap: .65rem; padding: .6rem .25rem; border-radius: var(--radius-s); transition: background .15s; }
+.leg > summary:hover { background: var(--hover); }
+.leg > summary::before { display: none; }
+.leg > summary::after { content: ""; width: .45rem; height: .45rem; flex: none; margin: 0 .2rem 0 .1rem;
+  border-right: 2px solid var(--ink-soft); border-bottom: 2px solid var(--ink-soft); transform: rotate(45deg);
+  transition: transform .3s ease; }
+.leg[open] > summary::after { transform: rotate(-135deg); }
+.leg-mark { flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%; display: grid; place-items: center;
+  font-size: .8rem; font-weight: 700; background: var(--chip); color: var(--ink-soft); }
+.leg.won .leg-mark { background: var(--won-bg); color: var(--good); }
+.leg.lost .leg-mark { background: var(--lost-bg); color: var(--bad); }
+.leg.void .leg-mark { background: var(--void-bg); color: var(--void); }
+.leg-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
+.leg-teams { font-size: .88rem; color: var(--ink-soft); }
+.leg-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: .1rem; text-align: right; }
+.leg-score { font-family: var(--head); font-size: 1.15rem; line-height: 1.1; }
+.leg.lost .leg-score { color: var(--bad); }
+.leg.won .leg-score { color: var(--good); }
+.mlabel { display: inline-flex; flex-direction: column; line-height: 1.25; }
+.msub { font-size: .8rem; font-weight: 400; }
+.leg-review { margin: 0 0 .6rem 2.15rem; padding: .6rem .8rem; background: var(--section); border-radius: var(--radius-s);
+  font-size: .92rem; }
+.leg-review p { margin: 0 0 .4rem; }
+.leg-review ul { margin: .2rem 0 .5rem; padding-left: 1.1rem; color: var(--ink-soft); }
+.leg-review li { margin: .15rem 0; }
+.leg-why { font-weight: 600; }
+.leg-why.lost { color: var(--bad); }
+.leg-link { font-size: .88rem; }
+.slip-foot { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; border-top: 1px solid var(--rule);
+  padding-top: .7rem; margin-top: .1rem; }
+.slip-foot div { display: flex; flex-direction: column; }
+.slip-foot b { font-family: var(--head); font-size: 1.1rem; }
+.slip-foot div:last-child { text-align: right; }
+.slip-note { margin: .4rem 0 0; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .status { font-size: .85rem; font-weight: 600; padding: .1rem .55rem; border-radius: 999px; }
 .status.open { background: var(--chip); }
 .status.won { background: var(--won-bg); color: var(--good); }

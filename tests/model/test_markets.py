@@ -73,9 +73,13 @@ def test_labels_and_groups_cover_all_markets():
 
 
 def test_market_label_uses_team_names():
-    from app.model.markets import market_label
-    assert market_label("EVALT15", "Galler", "Portekiz") == "Galler golleri 1.5 Alt"
-    assert market_label("DEPUST05", "Galler", "Portekiz") == "Portekiz golleri 0.5 Üst"
+    from app.model.markets import market_label, market_parts
+    assert market_parts("EVALT15", "Galler", "Portekiz") == ("Ev sahibi 1.5 Alt", "Galler golleri")
+    assert market_parts("DEPUST05", "Galler", "Portekiz") == ("Deplasman 0.5 Üst", "Portekiz golleri")
+    assert market_parts("ALT35", "Galler", "Portekiz") == ("Toplam gol 3.5 Alt", None)
+    assert market_parts("MS2", "Galler", "Portekiz") == ("MS 2", "Portekiz kazanır")
+    assert market_label("EVALT15", "Galler", "Portekiz") == "Ev sahibi 1.5 Alt (Galler golleri)"
     assert market_label("ALT35", "Galler", "Portekiz") == "Toplam gol 3.5 Alt"
     assert market_label("MS2", "Galler", "Portekiz") == "MS 2 (Portekiz kazanır)"
+    # takım adı yoksa kısa ad kullanılmaz; "Ev sahibi 1.5 Alt" tek başına toplam golle karışır
     assert market_label("EVALT15") == "Ev sahibi golleri 1.5 Alt"

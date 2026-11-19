@@ -46,7 +46,7 @@
       <tr class="section-row"><th colspan="5">{{ title }}</th></tr>
       {% for x in rows %}
       <tr data-market="{{ x.key }}" data-prob="{{ (x.prob * 100)|round|int }}">
-        <td><span class="help" data-tip="{{ MARKET_HELP[x.key] }}" tabindex="0" aria-label="{{ x.label }}: {{ MARKET_HELP[x.key] }}">{{ x.label }}</span>
+        <td>{% set mp = market_parts(x.key, m.home_team.name, m.away_team.name) %}<span class="help mlabel" data-tip="{{ MARKET_HELP[x.key] }}" tabindex="0" aria-label="{{ x.label }}: {{ MARKET_HELP[x.key] }}">{{ mp[0] }}{% if mp[1] %}<small class="msub">({{ mp[1] }})</small>{% endif %}</span>
           {% if picks.safe and picks.safe.market == x.key %}<span class="pick safe">Güvenli</span>{% endif %}
           {% if picks.value and picks.value.market == x.key %}<span class="pick value">Değerli</span>{% endif %}</td>
         <td class="num"><b>{{ x.prob|pct }}</b></td>

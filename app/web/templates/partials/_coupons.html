@@ -7,7 +7,7 @@
     {% for p in c.picks %}
     <div class="line">
       <span>{{ p.match.home_team.name }} – {{ p.match.away_team.name }}<br><small class="soft">{{ p.match.kickoff_utc|local_dt }}</small></span>
-      <span><b>{{ market_label(p.market, p.match.home_team.name, p.match.away_team.name) }}</b><br><small class="soft">{{ p.prob|pct }}</small></span>
+      <span>{{ market_html(p.market, p.match.home_team.name, p.match.away_team.name) }}<br><small class="soft">{{ p.prob|pct }}</small></span>
       <span class="num">{{ p.odds|odds }}</span>
     </div>
     {% endfor %}

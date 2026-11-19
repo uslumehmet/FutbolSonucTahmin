@@ -5,9 +5,14 @@ name: Gunluk gorevler
 
 on:
   schedule:
+    # GitHub zamanlanmış çalıştırmaları bazen hiç başlatmıyor (19 Kasım: 09:07, 11:07 ve 12:37 gelmedi,
+    # ilk çalıştırma 18:38'de oldu). Sabah ve öğlen yedek saatler bu yüzden var; iş yapılmışsa yedek bir şey yapmaz.
     - cron: "7 6 * * *"    # 09:07  sonuçlandırma + günlük güncelleme (maçlar, oranlar, eksikler)
+    - cron: "43 6 * * *"   # 09:43  yedek: günlük güncelleme
     - cron: "7 8 * * *"    # 11:07  otomatik oyun
-    - cron: "37 9 * * *"   # 12:37  yedek: 11:07 gecikir ya da atlanırsa
+    - cron: "41 8 * * *"   # 11:41  yedek: otomatik oyun
+    - cron: "37 9 * * *"   # 12:37  yedek: otomatik oyun
+    - cron: "23 10 * * *"  # 13:23  yedek: otomatik oyun
     - cron: "7 12 * * *"   # 15:07  sonuçlandırma
     - cron: "7 17 * * *"   # 20:07  sonuçlandırma
     - cron: "37 21 * * *"  # 00:37  sonuçlandırma

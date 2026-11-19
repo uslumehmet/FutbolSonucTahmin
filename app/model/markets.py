@@ -22,22 +22,30 @@ MARKET_LABELS = {
 }
 
 
-def market_label(key: str, home: str | None = None, away: str | None = None) -> str:
-    """Bahsin adı; takım adları verilirse "Ev sahibi"/"Deplasman" yerine takımın adı yazılır.
+def market_parts(key: str, home: str | None = None, away: str | None = None) -> tuple[str, str | None]:
+    """Bahsin kısa adı ve (takım adları verilirse) altına yazılacak açıklama.
 
-    Toplam gol bahisleri her zaman "Toplam gol" diye başlar; tek takımın golleri takımın adıyla
-    yazılır ("Galler golleri 1.5 Alt"). Böylece iki tür birbirine karışmaz.
+    Tek takımın golleri: ("Ev sahibi 1.5 Alt", "Galler golleri"). Maç sonucu ve çifte şans:
+    ("MS 2", "Portekiz kazanır"). Toplam gol bahisleri her zaman "Toplam gol" diye başlar, açıklaması yoktur.
+    Takım adı yoksa tam ad döner ("Ev sahibi golleri 1.5 Alt"), çünkü kısa ad tek başına toplam golle karışır.
     """
     label = MARKET_LABELS.get(key, key)
     if not (home and away):
-        return label
+        return label, None
     if key.startswith("EV"):
-        return label.replace("Ev sahibi", home, 1)
+        return label.replace("Ev sahibi golleri", "Ev sahibi", 1), f"{home} golleri"
     if key.startswith("DEP"):
-        return label.replace("Deplasman", away, 1)
-    return {"MS1": f"MS 1 ({home} kazanır)", "MSX": "MS X (beraberlik)", "MS2": f"MS 2 ({away} kazanır)",
-            "CS1X": f"ÇŞ 1X ({home} kaybetmez)", "CS12": "ÇŞ 12 (beraberlik olmaz)",
-            "CSX2": f"ÇŞ X2 ({away} kaybetmez)"}.get(key, label)
+        return label.replace("Deplasman golleri", "Deplasman", 1), f"{away} golleri"
+    sub = {"MS1": f"{home} kazanır", "MSX": "beraberlik", "MS2": f"{away} kazanır",
+           "CS1X": f"{home} kaybetmez", "CS12": "beraberlik olmaz", "CSX2": f"{away} kaybetmez"}.get(key)
+    return label, sub
+
+
+def market_label(key: str, home: str | None = None, away: str | None = None) -> str:
+    """Bahsin düz metin adı: "Ev sahibi 1.5 Alt (Galler golleri)", "MS 2 (Portekiz kazanır)"."""
+    main, sub = market_parts(key, home, away)
+    return f"{main} ({sub})" if sub else main
+
 
 MARKET_HELP = {
     "MS1": "Maç sonucu 1: maçı ev sahibi kazanır.",

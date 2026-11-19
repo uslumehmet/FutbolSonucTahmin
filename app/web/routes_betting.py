@@ -168,8 +168,10 @@ def my_coupons(request: Request, kasa: int | None = None, durum: str = "hepsi"):
                 q = q.filter(Coupon.status.in_(("won", "lost", "void")))
             bets = q.order_by(Bet.placed_at.desc()).limit(200).all()
             stats = wallet_stats(s, current)
+        from app.betting.review import reviews_for
+        reviews = reviews_for(s, [p for b in bets for p in b.coupon.picks])
         return _render(request, "kuponlarim.html", {"nav": "kuponlarim", "wallets": wallets, "current": current,
-                                                    "bets": bets, "stats": stats, "durum": durum,
+                                                    "bets": bets, "stats": stats, "durum": durum, "reviews": reviews,
                                                     "autoplay": autoplay_status(s, request.app.state.clock()),
                                                     "status_labels": STATUS_LABELS, "owner_labels": OWNER_LABELS})
 

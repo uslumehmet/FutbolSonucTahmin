@@ -182,3 +182,27 @@ def test_negative_net_shown_red(client_seeded, session_factory):
     kas = client_seeded.get("/kasalar").text
     assert 'class="num loss">' in kas  # eksi net kırmızı
     assert 'class="loss">' in client_seeded.get(f"/kuponlarim?kasa={w.id}").text
+
+
+def test_kuponlarim_pick_opens_match_review(client_seeded, session_factory):
+    """Kupondaki maça tıklayınca ne olduğu ve tutması için ne gerektiği görünür; takım golü adı iki satır."""
+    from datetime import date
+
+    from app.models import Bet, Coupon, CouponPick
+    w = _user_wallet(session_factory)
+    with session_factory() as s:
+        m = s.query(Match).filter_by(status="scheduled").first()
+        m.status, m.home_goals, m.away_goals = "finished", 2, 3
+        home = m.home_team.name
+        c = Coupon(mode="safe", source="user", target_odds=2.0, total_odds=1.22, prob=0.85, status="lost",
+                   play_date=date(2026, 11, 16))
+        s.add(c)
+        s.flush()
+        s.add(CouponPick(coupon_id=c.id, match_id=m.id, market="EVALT15", odds=1.22, prob=0.85, result="lost"))
+        s.add(Bet(wallet_id=w.id, coupon_id=c.id, stake=1000, payout=0))
+        s.commit()
+    html = client_seeded.get(f"/kuponlarim?kasa={w.id}").text
+    assert '<details class="leg lost">' in html
+    assert "<b>Ev sahibi 1.5 Alt</b>" in html and f"({home} golleri)" in html
+    assert f"{home} en fazla 1 gol atmalı" in html and f"Maç 2–3 bitti; {home} 2 gol attı." in html
+    assert f'href="/mac/{m.id}"' in html

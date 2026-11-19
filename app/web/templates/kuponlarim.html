@@ -34,21 +34,49 @@
   <div class="stat"><small>Açık kupon</small><b>{{ stats.open }}</b></div>
 </div>
 {% if not bets %}<div class="empty">Bu kasada kupon yok.{% if current.owner == 'user' %} <a href="/kupon">Kupon oluşturun</a>.{% else %} Sistem her gün 11:00 civarında oynar.{% endif %}</div>{% endif %}
+{% if bets %}<p class="slip-hint soft"><small>Bir maça tıklayınca o maçta ne olduğu, seçimin tutması için ne gerektiği ve model maçtan önce ne beklediği açılır.</small></p>{% endif %}
 <div class="slips">
   {% for b in bets %}{% set c = b.coupon %}
   <article class="slip {{ c.mode }}">
-    <h3><span class="status {{ c.status }}">{{ status_labels[c.status] }}</span> <small class="soft">{{ 'Güvenli' if c.mode == 'safe' else 'Değerli' }}, hedef {{ '%g'|format(c.target_odds) }}, {{ b.placed_at|local_dt }}</small></h3>
-    {% for p in c.picks %}
-    <div class="line">
-      <span>{{ p.match.home_team.name }} – {{ p.match.away_team.name }}
-        {% if p.match.status == 'finished' %}<small class="soft">({{ p.match.home_goals }}–{{ p.match.away_goals }})</small>{% endif %}</span>
-      <span><b>{{ market_label(p.market, p.match.home_team.name, p.match.away_team.name) }}</b> <small class="soft">{{ p.prob|pct }}</small></span>
-      <span class="r-{{ p.result }}">{{ p.odds|odds }} {{ {'pending': '', 'won': '✓', 'lost': '✗', 'void': 'iptal'}[p.result] }}</span>
+    <header class="slip-head">
+      <span class="status {{ c.status }}">{{ status_labels[c.status] }}</span>
+      <span class="slip-meta">{{ 'Güvenli' if c.mode == 'safe' else 'Değerli' }} · hedef {{ '%g'|format(c.target_odds) }}</span>
+      <span class="slip-time soft">{{ b.placed_at|local_dt }}</span>
+    </header>
+    <div class="legs">
+      {% for p in c.picks %}{% set m = p.match %}{% set rv = reviews[p.id] %}
+      <details class="leg {{ p.result }}">
+        <summary>
+          <span class="leg-mark" aria-hidden="true">{{ {'pending': '', 'won': '✓', 'lost': '✗', 'void': '–'}[p.result] }}</span>
+          <span class="leg-body">
+            <span class="leg-teams">{{ m.home_team.name }} – {{ m.away_team.name }}</span>
+            {{ market_html(p.market, m.home_team.name, m.away_team.name) }}
+          </span>
+          <span class="leg-side">
+            {% if m.status == 'finished' %}<b class="leg-score">{{ m.home_goals }}–{{ m.away_goals }}</b>
+            {% else %}<small>{{ m.kickoff_utc|local_dt }}</small>{% endif %}
+            <small class="soft">{{ p.odds|odds }} · {{ p.prob|pct }}</small>
+          </span>
+          <span class="visually-hidden">{{ {'pending': 'bekliyor', 'won': 'tuttu', 'lost': 'tutmadı', 'void': 'iptal'}[p.result] }}</span>
+        </summary>
+        <div class="leg-review">
+          <p><b>Tutması için:</b> {{ rv.needed }}.</p>
+          {% if rv.happened %}<p><b>Ne oldu:</b> {{ rv.happened }}</p>
+          {% elif m.status == 'scheduled' %}<p><b>Başlama:</b> {{ m.kickoff_utc|local_dt }} (Türkiye saati)</p>{% endif %}
+          {% if rv.why %}<p class="leg-why {{ p.result }}">{{ rv.why }}</p>{% endif %}
+          {% if rv.lines %}<ul>{% for x in rv.lines %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+          <a class="leg-link" href="/mac/{{ m.id }}">Maç sayfası →</a>
+        </div>
+      </details>
+      {% endfor %}
     </div>
-    {% endfor %}
-    <div class="sum"><span>Oran {{ c.total_odds|odds }}</span><span>Tutar {{ b.stake|tl }}</span></div>
-    <p>{% if b.payout is none %}Olası kazanç {{ (b.stake * c.total_odds)|round|int|tl }}{% else %}Ödeme <b>{{ b.payout|tl }}</b>{% endif %}
-      <br><small class="soft">Kuponun tutma ihtimali {{ c.prob|pct }}</small></p>
+    <footer class="slip-foot">
+      <div><small>Toplam oran</small><b>{{ c.total_odds|odds }}</b></div>
+      <div><small>Tutar</small><b>{{ b.stake|tl }}</b></div>
+      {% if b.payout is none %}<div><small>Olası kazanç</small><b>{{ (b.stake * c.total_odds)|round|int|tl }}</b></div>
+      {% else %}<div><small>Ödeme</small><b class="{{ 'pos' if b.payout > 0 else '' }}">{{ b.payout|tl }}</b></div>{% endif %}
+    </footer>
+    <p class="slip-note"><small>Kuponun tutma ihtimali {{ c.prob|pct }}</small></p>
   </article>
   {% endfor %}
 </div>

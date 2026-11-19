@@ -85,10 +85,18 @@ def make_templates() -> Jinja2Templates:
     t = Jinja2Templates(directory=str(WEB_DIR / "templates"))
     t.env.filters.update(pct=pct, odds=odds_fmt, tl=tl, local_dt=local_dt, local_iso=local_iso, local_time=local_time,
                          local_date=local_date, local_day=local_day, signed_pct=signed_pct)
-    from app.model.markets import MARKET_HELP, MARKET_LABELS, MARKET_SECTIONS, market_label
+    from markupsafe import Markup, escape
+
+    from app.model.markets import MARKET_HELP, MARKET_LABELS, MARKET_SECTIONS, market_label, market_parts
+
+    def market_html(key, home=None, away=None):
+        """Bahis adı, altında küçük açıklama: "Ev sahibi 1.5 Alt" / "(Galler golleri)"."""
+        main, sub = market_parts(key, home, away)
+        sub_html = f'<small class="msub">({escape(sub)})</small>' if sub else ""
+        return Markup(f'<span class="mlabel"><b>{escape(main)}</b>{sub_html}</span>')
     static = WEB_DIR / "static"
     asset_v = str(int(max((static / f).stat().st_mtime for f in ("app.css", "app.js"))))  # önbellek kırıcı
-    t.env.globals.update(AUTH_ON=lambda: bool(site_password()), ASSET_V=asset_v, MARKET_LABELS=MARKET_LABELS, market_label=market_label, MARKET_HELP=MARKET_HELP, MARKET_SECTIONS=MARKET_SECTIONS,
+    t.env.globals.update(AUTH_ON=lambda: bool(site_password()), ASSET_V=asset_v, MARKET_LABELS=MARKET_LABELS, market_label=market_label, market_html=market_html, market_parts=market_parts, MARKET_HELP=MARKET_HELP, MARKET_SECTIONS=MARKET_SECTIONS,
                          ROLES=ROLES, LEVELS=list(LEVELS))
     return t
 
