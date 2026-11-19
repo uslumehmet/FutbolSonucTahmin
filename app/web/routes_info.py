@@ -9,7 +9,9 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.betting.settlement import wallet_stats
-from app.betting.stats import calibration_rows, live_calibration, mode_stats, singles_stats
+from app.betting.stats import (
+    LEAGUE_ACCURACY_KEY, calibration_rows, live_calibration, mode_stats, refresh_league_accuracy, singles_stats,
+)
 from app.config import api_key, get_settings, get_value, save_settings, set_value
 from app.data.api_football import ApiFootball, probe
 from app.data.ingest import competition_teams
@@ -52,9 +54,12 @@ def performance(request: Request):
         calib = {g: live_calibration(s, g, rows=cal_rows) for g in GROUP_LABELS}
         bt = s.query(BacktestRun).order_by(BacktestRun.id.desc()).first()
         settled = s.query(Coupon).filter(Coupon.source == "auto", Coupon.status.in_(("won", "lost", "void"))).count()
+        league_acc = get_value(s, LEAGUE_ACCURACY_KEY)
+        if league_acc is None:  # ilk açılışta bir kez hesaplanır; sonra haftalık eğitimde yenilenir
+            league_acc = refresh_league_accuracy(s, request.app.state.clock())
         ctx = {"nav": "performans", "rows": rows, "series_json": json.dumps(series), "modes": modes,
                "singles": singles, "calib": calib, "bt": bt.report if bt else None, "group_labels": GROUP_LABELS,
-               "settled": settled, "l2_active": get_value(s, "layer2_active", {}) or {},
+               "settled": settled, "league_acc": league_acc, "l2_active": get_value(s, "layer2_active", {}) or {},
                "l2_metrics": get_value(s, "layer2_metrics", {}) or {}}
         return request.app.state.render(request, "performans.html", ctx)
 

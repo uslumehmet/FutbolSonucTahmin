@@ -33,7 +33,7 @@ Futbol maçlarının nasıl biteceğini istatistik ve makine öğrenmesiyle tahm
 
 - Windows 10 veya 11.
 - [Python 3.14](https://www.python.org/downloads/). Kurulumda **"Add python.exe to PATH"** kutusunu işaretleyin. Proje bu sürümle test edildi.
-- İnternet: ilk kurulumda Python paketleri için yaklaşık 100 MB, geçmiş maç verileri için yaklaşık 15 MB indirilir. Sonrasında günlük kullanım çok azdır, her şey önbellekte tutulur.
+- İnternet: ilk kurulumda Python paketleri için yaklaşık 100 MB, geçmiş maç verileri için yaklaşık 25 MB indirilir (openfootball, milli maçlar ve eksik sonuçlar için ESPN; hiçbiri kayıt ya da anahtar istemez). Sonrasında günlük kullanım çok azdır, her şey önbellekte tutulur.
 
 **Adımlar**
 
@@ -164,7 +164,7 @@ Kurulum bitince site `https://futbol-sonuc-tahmin-....onrender.com` gibi bir adr
 
 ```
 app/
-  data/       veri indirme ve içe aktarma (openfootball, martj42, API-Football)
+  data/       veri indirme ve içe aktarma (openfootball, martj42, API-Football, ESPN)
   model/      gol modelleri, Elo, makine öğrenmesi katmanı, tahmin türleri
   betting/    seçim, kupon kurma, sanal kasalar, sonuçlandırma
   backtest/   geçmiş testi

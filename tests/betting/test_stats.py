@@ -55,3 +55,33 @@ def test_live_calibration(session):
     session.commit()
     bins = live_calibration(session, "1X2")
     assert bins == [[pytest.approx(0.735), 0.5, 2]]
+
+
+def test_league_accuracy_counts_hits_favorites_and_current_season(session):
+    from datetime import UTC, datetime
+
+    from app.betting.stats import league_accuracy
+    from app.models import Competition, Team
+    comp = session.query(Competition).filter_by(code="T1").one()
+    a, b = Team(name="A", kind="club"), Team(name="B", kind="club")
+    session.add_all([a, b])
+    session.flush()
+
+    def add(season, hg, ag, probs):
+        m = Match(competition_id=comp.id, season=season, kickoff_utc=datetime(season, 10, 1, tzinfo=UTC),
+                  home_team_id=a.id, away_team_id=b.id, status="finished", home_goals=hg, away_goals=ag, stats={})
+        session.add(m)
+        session.flush()
+        session.add(Prediction(match_id=m.id, kind="walkforward", probs=probs, created_at=m.kickoff_utc))
+
+    fav = {"MS1": 0.65, "MSX": 0.2, "MS2": 0.15, "UST25": 0.6}
+    add(2026, 2, 1, fav)          # favori tuttu, 2.5 Üst tuttu, bu sezon
+    add(2025, 0, 0, fav)          # favori tutmadı, 2.5 Alt oldu
+    add(2025, 1, 2, {"MS1": 0.3, "MSX": 0.3, "MS2": 0.4, "UST25": 0.4})  # doğru (MS2), favori değil
+    add(2020, 3, 0, fav)          # eski sezon: sayılmaz
+    session.commit()
+    out = league_accuracy(session, date(2026, 11, 20))
+    t1 = next(x for x in out["leagues"] if x["code"] == "T1")
+    assert (t1["n"], t1["ok"], t1["fav_n"], t1["fav_ok"], t1["cur_n"], t1["cur_ok"]) == (3, 2, 2, 1, 1, 1)
+    assert (t1["ou_n"], t1["ou_ok"], t1["home"]) == (3, 1, 1)
+    assert out["seasons"] == [2024, 2026] and out["total"]["n"] == 3

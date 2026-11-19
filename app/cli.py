@@ -31,6 +31,30 @@ def cmd_history(_args) -> None:
         print(f"  {comp.name}: {cnt}")
 
 
+# openfootball'da eksik olan eski sezonlar; ESPN'den tamamlanır (bu sezon ve geçen sezon her ligde ayrıca denenir).
+ESPN_EXTRA_SEASONS = {"T1": [2021, 2022]}
+
+
+def _init_espn() -> None:
+    """İlk kurulumda openfootball'un vermediği sonuçları ESPN'den indirir (anahtar gerekmez, ~1.000 dosya, ~10 MB)."""
+    from app.config import TZ
+    from app.data.espn import ingest_espn
+
+    today = _utcnow().astimezone(TZ).date()
+    current = current_season_start(today)
+    print("Eksik sonuçlar ESPN'den tamamlanıyor (birkaç dakika sürebilir)...")
+    s = _session()
+    rep = ingest_espn(s, today, seasons=[current - 1, current], max_requests=2000)
+    for code, seasons in ESPN_EXTRA_SEASONS.items():
+        extra = ingest_espn(s, today, codes=[code], seasons=seasons, max_requests=500)
+        rep.results += extra.results
+        rep.unresolved += extra.unresolved
+        rep.errors += extra.errors
+    print(f"ESPN: {rep.results} sonuç.")
+    for line in rep.unresolved + rep.errors:
+        print("  ", line)
+
+
 def cmd_intl(_args) -> None:
     from app.data.ingest import ingest_international
 
@@ -109,6 +133,7 @@ def cmd_init(_args) -> None:
     s = _session()
     ensure_default_wallets(s)
     cmd_history(_args)
+    _init_espn()
     cmd_intl(_args)
     print("Geçmiş tahminler ve makine öğrenmesi katmanı hazırlanıyor (birkaç dakika sürebilir)...")
     cmd_walkforward(_args)

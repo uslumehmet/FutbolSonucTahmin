@@ -127,6 +127,8 @@ def weekly_retrain(sf, now: datetime) -> None:
         for lg in CLUB_LEAGUES:
             walkforward_club(s, lg.code, season - 1, season)
         train_layer2_all(s)
+        from app.betting.stats import refresh_league_accuracy
+        refresh_league_accuracy(s, now)  # Performans'taki lig lig doğruluk tablosu
     mark_job(sf, "retrain", now)
 
 

@@ -73,3 +73,15 @@ def test_settings_low_data_toggle(client, session_factory):
     client.post("/ayarlar", data={"safe_min_odds": "1.25"}, follow_redirects=True)  # başka form: dokunma
     with session_factory() as s:
         assert get_settings(s).safe_skip_low_data is True
+
+
+def test_performance_shows_league_accuracy_table(client_seeded):
+    from app.config import set_value
+    with client_seeded.app.state.sf() as s:
+        set_value(s, "league_accuracy", {"seasons": [2024, 2026], "at": "2026-11-20T09:00:00+00:00", "leagues": [
+            {"code": "T1", "name": "Süper Lig", "n": 10, "ok": 5, "ou_n": 10, "ou_ok": 6, "fav_n": 4, "fav_ok": 3,
+             "home": 4, "cur_n": 2, "cur_ok": 1}],
+            "total": {"n": 10, "ok": 5, "ou_n": 10, "ou_ok": 6, "fav_n": 4, "fav_ok": 3, "home": 4, "cur_n": 2, "cur_ok": 1}})
+    html = client_seeded.get("/performans").text
+    assert "Lig lig doğruluk" in html and "Süper Lig" in html and "%50" in html and "%75" in html
+    assert "%40" in html  # hep ev sahibi karşılaştırması

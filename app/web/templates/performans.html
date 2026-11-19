@@ -78,6 +78,30 @@
   {% endfor %}
 </div>
 
+{% macro rate(ok, n) %}{% if n %}<b>{{ (ok / n)|pct }}</b> <small class="soft">{{ ok }}/{{ n }}</small>{% else %}<span class="soft">–</span>{% endif %}{% endmacro %}
+{% if league_acc and league_acc.leagues %}{% set la = league_acc %}
+<section class="panel" id="lig-dogruluk" style="margin-top:.5rem">
+  <h2>Lig lig doğruluk</h2>
+  <p class="soft"><small>Geriye dönük test: her maç, oynandığı güne kadarki veriyle tahmin edildi ve gerçek sonuçla karşılaştırıldı.
+    {{ la.seasons[0] }}-{{ (la.seasons[0] + 1) % 100 }} sezonundan bu sezona kadar. Bu tablo kuponlardan değil modelin tahminlerinden hesaplanır.</small></p>
+  <div class="table-wrap"><table>
+    <tr><th>Lig</th><th class="num">Maç</th><th class="num">Maç sonucu doğru</th><th class="num">Toplam gol 2.5 Alt/Üst doğru</th>
+      <th class="num" data-tip="Model bir takımın kazanmasına en az %60 ihtimal verdiğinde o takım kaç kez kazandı?">Güçlü favori kazandı</th>
+      <th class="num">Bu sezon maç sonucu</th></tr>
+    {% for a in la.leagues %}
+    <tr><td>{{ a.name }}</td><td class="num">{{ a.n }}</td><td class="num">{{ rate(a.ok, a.n) }}</td>
+      <td class="num">{{ rate(a.ou_ok, a.ou_n) }}</td><td class="num">{{ rate(a.fav_ok, a.fav_n) }}</td>
+      <td class="num">{{ rate(a.cur_ok, a.cur_n) }}</td></tr>
+    {% endfor %}
+    {% set t = la.total %}
+    <tr class="total-row"><td><b>Hepsi</b></td><td class="num">{{ t.n }}</td><td class="num">{{ rate(t.ok, t.n) }}</td>
+      <td class="num">{{ rate(t.ou_ok, t.ou_n) }}</td><td class="num">{{ rate(t.fav_ok, t.fav_n) }}</td><td class="num">{{ rate(t.cur_ok, t.cur_n) }}</td></tr>
+  </table></div>
+  <p class="soft"><small>Karşılaştırma için: maç sonucunda üç seçenek var, rastgele tahmin %33 tutar; her maçta "ev sahibi kazanır" demek bu maçlarda {{ (t.home / t.n)|pct }} tuttu.
+    Bu sezonun sayıları az maça dayanır, sezon başında belirsizlik yüksektir. Tablo her hafta modeller yeniden eğitilince yenilenir{% if la.at %} (son: {{ la.at|local_iso }}){% endif %}.</small></p>
+</section>
+{% endif %}
+
 <details class="panel" style="margin-top:.5rem">
   <summary><h2>Model ayrıntıları</h2><small class="soft" style="margin-left:auto">canlı kalibrasyon, geçmiş test, makine öğrenmesi</small></summary>
 

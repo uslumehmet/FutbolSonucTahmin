@@ -88,3 +88,62 @@ def live_calibration(session, group: str, bins: int = 10, rows=None) -> list[lis
         if mask.any():
             out.append([round(float(p[mask].mean()), 4), round(float(y[mask].mean()), 4), int(mask.sum())])
     return out
+
+
+LEAGUE_ACCURACY_KEY = "league_accuracy"
+FAVORITE_PROB = 0.60  # "güçlü favori": model bir takımın kazanmasına en az bu ihtimali veriyor
+
+
+def league_accuracy(session, today, seasons_back: int = 2) -> dict:
+    """Lig lig model doğruluğu: geriye dönük testteki (walkforward) tahminler ile gerçek sonuçlar.
+
+    Her maç, oynandığı güne kadarki veriyle tahmin edilmiştir. Son `seasons_back` sezon + bu sezon sayılır.
+    """
+    from app.config import CLUB_LEAGUES, current_season_start
+
+    current = current_season_start(today)
+    first = current - seasons_back
+    rows = (session.query(Competition.code, Match.id, Match.season, Match.home_goals, Match.away_goals,
+                          Prediction.probs, Prediction.created_at)
+            .join(Match, Match.competition_id == Competition.id)
+            .join(Prediction, Prediction.match_id == Match.id)
+            .filter(Competition.kind == "club", Prediction.kind == "walkforward", Match.status == "finished",
+                    Match.season >= first, Match.home_goals.isnot(None))
+            .order_by(Prediction.created_at))
+    latest = {}
+    for code, mid, season, hg, ag, probs, _ in rows:
+        latest[mid] = (code, season, hg, ag, probs or {})  # sıralı: en son tahmin kalır
+    acc = {lg.code: {"code": lg.code, "name": lg.name, "n": 0, "ok": 0, "ou_n": 0, "ou_ok": 0, "fav_n": 0,
+                     "fav_ok": 0, "home": 0, "cur_n": 0, "cur_ok": 0} for lg in CLUB_LEAGUES}
+    for code, season, hg, ag, pr in latest.values():
+        if code not in acc or not all(k in pr for k in ("MS1", "MSX", "MS2")):
+            continue
+        a = acc[code]
+        result = "MS1" if hg > ag else "MS2" if hg < ag else "MSX"
+        hit = max(("MS1", "MSX", "MS2"), key=lambda k: pr[k]) == result
+        a["n"] += 1
+        a["ok"] += hit
+        a["home"] += result == "MS1"
+        if season == current:
+            a["cur_n"] += 1
+            a["cur_ok"] += hit
+        if "UST25" in pr:
+            a["ou_n"] += 1
+            a["ou_ok"] += (pr["UST25"] >= 0.5) == (hg + ag > 2)
+        fav = max(("MS1", "MS2"), key=lambda k: pr[k])
+        if pr[fav] >= FAVORITE_PROB:
+            a["fav_n"] += 1
+            a["fav_ok"] += fav == result
+    leagues = [a for a in acc.values() if a["n"]]
+    total = {k: sum(a[k] for a in leagues) for k in ("n", "ok", "ou_n", "ou_ok", "fav_n", "fav_ok", "home",
+                                                       "cur_n", "cur_ok")}
+    return {"seasons": [first, current], "leagues": leagues, "total": total}
+
+
+def refresh_league_accuracy(session, now) -> dict:
+    from app.config import TZ, set_value
+
+    data = league_accuracy(session, now.astimezone(TZ).date())
+    data["at"] = now.isoformat()
+    set_value(session, LEAGUE_ACCURACY_KEY, data)
+    return data
