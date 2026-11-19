@@ -1,0 +1,222 @@
+"""İkinci sonuç kaynağı: ESPN'in herkese açık maç sonuçları (anahtar gerekmez).
+
+API-Football'un ücretsiz planı geçmiş günleri ve 2025 sonrası sezonları vermiyor, openfootball da geç
+güncelleniyor. ESPN'den sadece biten maçların skoru alınır; oran, sakatlık ve tahmin işleri API-Football'da kalır.
+ESPN resmi, belgelenmiş bir API değildir; adres değişirse bu kaynak hata verir ama site çalışmaya devam eder.
+
+Her lig sezonunun maç günleri ESPN yanıtındaki takvimden okunur, yalnızca maç olan günler istenir.
+İndirilen her gün `data/raw/espn/` altında saklanır; tamamlanan günler veritabanında işaretlenir ve bir daha işlenmez.
+"""
+from __future__ import annotations
+
+import json
+import logging
+from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
+
+import httpx
+import pandas as pd
+
+from app.config import CLUB_LEAGUES, RAW_DIR, current_season_start, get_value, set_value
+from app.data.http import fetch_text, is_fresh
+from app.data.teams import add_alias, resolve_team, seed_aliases
+from app.models import Competition, Match, Team
+
+log = logging.getLogger(__name__)
+
+BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
+SLUGS = {"T1": "tur.1", "E0": "eng.1", "SP1": "esp.1", "D1": "ger.1", "I1": "ita.1", "F1": "fra.1"}
+ESPN_DIR = RAW_DIR / "espn"
+DONE_KEY = "espn_done"  # işlenmiş ve bir daha değişmeyecek günler: "T1:20261018"
+SETTLED_AFTER = timedelta(days=2)  # bu kadar eski günler kesinleşmiş sayılır (dosya bir daha indirilmez)
+
+
+@dataclass
+class EspnReport:
+    requests: int = 0
+    days: int = 0
+    results: int = 0
+    unresolved: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    stopped: bool = False  # istek sınırına gelindi; kalan günler bir sonraki çalışmada
+
+
+def day_url(slug: str, day: date) -> str:
+    return f"{BASE}/{slug}/scoreboard?dates={day:%Y%m%d}"
+
+
+def _calendar_days(league: dict) -> list[date]:
+    out = []
+    for entry in league.get("calendar") or []:
+        if isinstance(entry, str):
+            out.append(date.fromisoformat(entry[:10]))
+        elif isinstance(entry, dict):  # bazı liglerde takvim bölümler hâlinde gelir
+            for sub in entry.get("entries") or []:
+                if sub.get("startDate"):
+                    out.append(date.fromisoformat(sub["startDate"][:10]))
+    return sorted(set(out))
+
+
+def parse_scoreboard(text: str) -> tuple[int | None, list[date], list[dict]]:
+    """(sezon başlangıç yılı, maç günleri, maçlar). Maç: season, kickoff_utc, home, away, completed, fthg, ftag.
+
+    Bir sezonun takvimi bazen sonraki sezonun ilk günlerini de içerir (2021-22 takviminde Ağustos 2022);
+    bu yüzden her maçın kendi sezon bilgisi de okunur."""
+    data = json.loads(text)
+    league = (data.get("leagues") or [{}])[0]
+    season = (league.get("season") or {}).get("year")
+    events = []
+    for e in data.get("events") or []:
+        comp = (e.get("competitions") or [{}])[0]
+        sides = {c.get("homeAway"): c for c in comp.get("competitors") or []}
+        if "home" not in sides or "away" not in sides:
+            continue
+        status = (e.get("status") or {}).get("type") or {}
+        completed = bool(status.get("completed")) and status.get("state") == "post"
+        row = {"season": (e.get("season") or {}).get("year"),
+               "kickoff_utc": datetime.fromisoformat(e["date"].replace("Z", "+00:00")),
+               "home": sides["home"]["team"]["displayName"], "away": sides["away"]["team"]["displayName"],
+               "completed": completed, "fthg": None, "ftag": None}
+        if completed:
+            try:
+                row["fthg"], row["ftag"] = int(sides["home"]["score"]), int(sides["away"]["score"])
+            except (KeyError, TypeError, ValueError):
+                row["completed"] = False
+        events.append(row)
+    return season, _calendar_days(league), events
+
+
+def _season_teams(session, comp: Competition, season: int) -> list[Team]:
+    ids = {i for m in session.query(Match.home_team_id, Match.away_team_id)
+           .filter_by(competition_id=comp.id, season=season) for i in m}
+    return session.query(Team).filter(Team.id.in_(ids)).all() if ids else []
+
+
+def resolve_names(session, comp: Competition, season: int, names: list[str],
+                  country: str) -> tuple[dict[str, int], list[str]]:
+    """ESPN adlarını takımlara eşler. Sezonun takımları veritabanında varsa sadece onların arasında arar ve
+    bulamadığı adı eşlemez (yanlış eşleşme ya da çift takım olmasın); böyle adlar için aliases.csv'ye satır eklenir.
+    Sezon veritabanında hiç yoksa (ör. Süper Lig 2021-22) ligin bütün takımları arasında arar, yoksa yeni takım açar."""
+    season_teams = _season_teams(session, comp, season)
+    pool = list(season_teams) or list(_competition_teams(session, comp))
+    out: dict[str, int] = {}
+    unresolved = []
+    for name in names:
+        free = [t for t in pool if t.id not in out.values()]
+        team = resolve_team(session, "espn", name, free)
+        if team is not None and team.id in out.values():
+            team = None
+        if team is None and not season_teams:
+            team = Team(name=name.strip(), kind="club", country=country)
+            session.add(team)
+            session.flush()
+            add_alias(session, team.id, "espn", name)
+            pool.append(team)
+        if team is None:
+            unresolved.append(name)
+        else:
+            out[name] = team.id
+    return out, unresolved
+
+
+def _competition_teams(session, comp: Competition) -> list[Team]:
+    from app.data.ingest import competition_teams
+    return competition_teams(session, comp)
+
+
+def _upsert(session, comp: Competition, season: int, rows: list[dict], ids: dict[str, int]) -> int:
+    """Biten maçları yazar. API-Football'dan gelmiş bitmiş maça dokunmaz; plan maçını (fikstür) sonuçlandırır."""
+    existing = {(m.home_team_id, m.away_team_id): m
+                for m in session.query(Match).filter_by(competition_id=comp.id, season=season)}
+    n = 0
+    for r in rows:
+        if r["home"] not in ids or r["away"] not in ids:
+            continue
+        key = (ids[r["home"]], ids[r["away"]])
+        m = existing.get(key)
+        if m is None:
+            m = Match(competition_id=comp.id, season=season, home_team_id=key[0], away_team_id=key[1],
+                      kickoff_utc=r["kickoff_utc"], stats={})
+            session.add(m)
+            existing[key] = m
+        elif m.status == "finished" and m.api_fixture_id is not None:
+            continue  # API sonucu esas alınır
+        m.kickoff_utc = r["kickoff_utc"]
+        m.status = "finished"
+        m.home_goals, m.away_goals = r["fthg"], r["ftag"]
+        n += 1
+    session.commit()
+    return n
+
+
+def _fetch(url, dest, max_age, fetch, rep: EspnReport, max_requests: int) -> str | None:
+    if not is_fresh(dest, max_age):
+        if rep.requests >= max_requests:
+            rep.stopped = True
+            return None
+        rep.requests += 1
+    return fetch(url, dest, max_age)
+
+
+def ingest_espn(session, today: date, codes: list[str] | None = None, seasons: list[int] | None = None,
+                recent_days: int | None = None, fetch=fetch_text, max_requests: int = 150) -> EspnReport:
+    """ESPN'den biten maçları yükler.
+
+    seasons verilmezse bu sezon. recent_days verilirse sadece son o kadar günün maç günleri (günlük iş).
+    max_requests: bu çalışmada en fazla kaç dosya indirilir (önbellekteki dosyalar sayılmaz).
+    """
+    rep = EspnReport()
+    seed_aliases(session)  # aliases.csv'deki "espn" satırları (ör. Erzurum BB → BB Erzurumspor)
+    current = current_season_start(today)
+    seasons = seasons or [current]
+    done = set(get_value(session, DONE_KEY) or [])
+    leagues = [lg for lg in CLUB_LEAGUES if lg.code in SLUGS and (codes is None or lg.code in codes)]
+    for lg in leagues:
+        comp = session.query(Competition).filter_by(code=lg.code).one()
+        slug = SLUGS[lg.code]
+        for season in seasons:
+            if rep.stopped:
+                break
+            probe = date(season, 10, 15) if season < current or today >= date(season, 10, 15) else today
+            try:
+                text = _fetch(day_url(slug, probe), ESPN_DIR / f"{lg.code}_{season}_takvim.json",
+                              None if season < current else timedelta(days=1), fetch, rep, max_requests)
+                if text is None:
+                    break
+                got_season, calendar, _ = parse_scoreboard(text)
+            except (httpx.HTTPError, ValueError, KeyError) as exc:
+                rep.errors.append(f"{lg.name} {season} takvim: {exc}")
+                continue
+            if got_season is not None and got_season != season:
+                rep.errors.append(f"{lg.name} {season}: ESPN başka sezon döndürdü ({got_season})")
+                continue
+            days = [d for d in calendar if d < today and f"{lg.code}:{d:%Y%m%d}" not in done]
+            if recent_days is not None:
+                days = [d for d in days if d >= today - timedelta(days=recent_days)]
+            rows, finished_days = [], []
+            for d in days:
+                settled = today - d >= SETTLED_AFTER
+                try:
+                    text = _fetch(day_url(slug, d), ESPN_DIR / lg.code / f"{d:%Y%m%d}.json",
+                                  None if settled else timedelta(hours=6), fetch, rep, max_requests)
+                except (httpx.HTTPError, ValueError) as exc:
+                    rep.errors.append(f"{lg.name} {d}: {exc}")
+                    continue
+                if text is None:
+                    break
+                _, _, events = parse_scoreboard(text)
+                rep.days += 1
+                rows += [e for e in events if e["completed"] and e["season"] in (None, season)]
+                if settled and all(e["completed"] for e in events):
+                    finished_days.append(f"{lg.code}:{d:%Y%m%d}")
+            if not rows:
+                done |= set(finished_days)
+                continue
+            names = list(dict.fromkeys([r["home"] for r in rows] + [r["away"] for r in rows]))
+            ids, unresolved = resolve_names(session, comp, season, names, lg.country)
+            rep.unresolved += [f"{lg.name} {season}: {n}" for n in unresolved]
+            rep.results += _upsert(session, comp, season, rows, ids)
+            if not unresolved:  # eşleşmeyen ad varsa o günler bir dahaki sefere yeniden işlensin
+                done |= set(finished_days)
+    set_value(session, DONE_KEY, sorted(done))
+    return rep

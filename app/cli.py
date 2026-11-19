@@ -152,6 +152,42 @@ def cmd_catch_up(_args) -> None:
             print(f"{key}: {get_value(s, key)}")
 
 
+def cmd_espn(args) -> None:
+    """ESPN'den eksik maç sonuçlarını doldurur.
+
+    Örnek: python -m app.cli espn --sezon 2021 2025 2026 --lig T1 --sinir 400
+    --sezon verilmezse bu sezon; --lig verilmezse altı lig; --sinir bu çalışmada en fazla kaç dosya indirileceği.
+    """
+    from datetime import date
+
+    from app.config import TZ
+    from app.data.espn import ingest_espn
+
+    def values(flag):
+        if flag not in args.rest:
+            return None
+        i = args.rest.index(flag) + 1
+        out = []
+        while i < len(args.rest) and not args.rest[i].startswith("--"):
+            out.append(args.rest[i])
+            i += 1
+        return out
+
+    seasons = [int(x) for x in values("--sezon") or []] or None
+    codes = values("--lig")
+    limit = int((values("--sinir") or ["300"])[0])
+    today = _utcnow().astimezone(TZ).date()
+    with _sf()() as s:
+        rep = ingest_espn(s, today, codes=codes, seasons=seasons, max_requests=limit)
+    print(f"İndirilen dosya: {rep.requests}, işlenen gün: {rep.days}, yazılan sonuç: {rep.results}")
+    if rep.stopped:
+        print("İstek sınırına gelindi; kalan günler için komutu yeniden çalıştırın.")
+    for line in rep.unresolved:
+        print("Eşleşmeyen takım:", line)
+    for line in rep.errors:
+        print("Hata:", line)
+
+
 def cmd_tasi(args) -> None:
     """Bilgisayardaki SQLite veritabanını HEDEF_DB_URL adresindeki bulut veritabanına kopyalar."""
     import os
@@ -173,7 +209,7 @@ def cmd_tasi(args) -> None:
     print(f"Bitti: {sum(counts.values())} satır kopyalandı.")
 
 
-COMMANDS = {"catch-up": cmd_catch_up, "tasi": cmd_tasi, "init": cmd_init, "update": cmd_update, "autoplay": cmd_autoplay, "settle": cmd_settle,
+COMMANDS = {"catch-up": cmd_catch_up, "espn": cmd_espn, "tasi": cmd_tasi, "init": cmd_init, "update": cmd_update, "autoplay": cmd_autoplay, "settle": cmd_settle,
             "history": cmd_history, "intl": cmd_intl, "probe": cmd_probe, "walkforward": cmd_walkforward,
             "train-layer2": cmd_train_layer2, "backtest": cmd_backtest}
 

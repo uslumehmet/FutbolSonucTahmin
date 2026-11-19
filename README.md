@@ -61,7 +61,7 @@ Yaklaşan maçlar, oranlar ve sakat ya da cezalı oyuncular [API-Football](https
 - Günde 100, dakikada 10 istek. Kota her gün yenilenir; ücretsiz plan süresizdir, ay sonunda bitmez. Site isteklerini kendisi yavaşlatır ve her yanıtı önbellekte tutar, böylece aynı veri iki kez istenmez. Sayfaları gezmek istek harcamaz; istekleri sadece günlük güncelleme ve Ayarlar'daki deneme düğmesi kullanır. Yoğun bir hafta sonu günü yaklaşık 40–60 istek gider. Kota dolarsa sistem durur ve ertesi gün kaldığı yerden devam eder.
 - Kotayı artırmak için birden fazla ücretsiz hesap açmak API-Football [kurallarına](https://www.api-football.com/terms) aykırıdır; hesap kapatılabilir.
 - Tarihe göre maç sorgusu sadece dün, bugün ve yarın için çalışır. Bu yüzden ileriki günlerin maçları openfootball'daki sezon fikstüründen alınır; oranları ve kesin saati maçtan bir gün önce gelir. Kupon da o zaman kurulabilir.
-- Lig ve sezon sorguları sadece 2022–2024 sezonları için çalışır. Bu sezonun eksik kalan geçmişi, openfootball güncellendikçe dolar.
+- Lig ve sezon sorguları sadece 2022–2024 sezonları için çalışır. Bu sezonun ve eski sezonların eksik kalan sonuçları ESPN'den tamamlanır (aşağıda).
 
 > **Anahtarınız size özeldir.** Kimseyle paylaşmayın, ekran görüntüsünde göstermeyin. `.env` dosyası ve `data/` klasörü `.gitignore` içindedir, GitHub'a yüklenmez. Anahtarınız bir yere sızarsa API-Football panelinden yenisini alın.
 
@@ -184,6 +184,7 @@ data/         sadece sizin bilgisayarınızda: veritabanı, indirilen veriler, m
 - [openfootball](https://github.com/openfootball): kulüp maç geçmişi.
 - [martj42/international_results](https://github.com/martj42/international_results): milli maç geçmişi.
 - [API-Football](https://www.api-football.com): yaklaşan maçlar, oranlar, eksik oyuncular ve sonuçlar. Kendi kullanım koşulları geçerlidir; her kullanıcı kendi anahtarını kullanır.
+- ESPN'in herkese açık maç sonuçları (`site.api.espn.com`, anahtar gerekmez): API-Football'un ücretsiz planının ve openfootball'un vermediği günlerin skorları. Resmi, belgelenmiş bir API değildir; adres değişirse sadece eksik doldurma durur. Elle doldurma: `python -m app.cli espn --sezon 2025 2026 --lig T1`.
 - Üçüncü taraf JavaScript kütüphaneleri ve lisansları: [app/web/static/vendor/LISANSLAR.md](app/web/static/vendor/LISANSLAR.md).
 
 ## Sorumluluk reddi

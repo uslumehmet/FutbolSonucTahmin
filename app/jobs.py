@@ -17,6 +17,7 @@ log = logging.getLogger(__name__)
 _LOCK = threading.Lock()
 BACKFILL_PER_DAY = 30
 PREDICT_DAYS = 7  # maçlar sayfasındaki '7 gün' görünümü
+ESPN_RECENT_DAYS = 10  # günlük güncellemede ESPN'den son kaç günün sonuçları tamamlanır
 
 
 def make_api(session):
@@ -70,6 +71,14 @@ def daily_update(sf, now: datetime) -> None:
             bf = backfill_dates(s, api, gap_start(s, today), today - timedelta(days=1), max_requests=BACKFILL_PER_DAY)
             rep.errors += bf.errors
             rep.results += bf.results
+        try:  # ikinci kaynak: API'nin göremediği günlerin sonuçları (ESPN); hata verirse güncelleme sürer
+            from app.data.espn import ingest_espn
+            es = ingest_espn(s, now.astimezone(TZ).date(), recent_days=ESPN_RECENT_DAYS, max_requests=40)
+            rep.results += es.results
+            rep.errors += [f"ESPN: {e}" for e in es.errors] + [f"ESPN eşleşmeyen: {u}" for u in es.unresolved]
+        except Exception as exc:  # noqa: BLE001 - ikinci kaynak asıl işi durdurmamalı
+            log.exception("ESPN hatası")
+            rep.errors.append(f"ESPN: {exc}")
         preds = predict_upcoming(s, ModelStore(s), now, days=PREDICT_DAYS)
         if s.get_bind().dialect.name != "sqlite":  # bilgisayardaki önbellek olduğu gibi kalır
             from app.data.api_football import prune_old_bodies
