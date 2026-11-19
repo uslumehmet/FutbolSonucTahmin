@@ -26,6 +26,7 @@
 {% endif %}
 {% if current %}
 <h2>{{ current.name }} {% if current.busted %}<span class="wallet-busted">battı</span>{% endif %}</h2>
+{% if current.min_prob %}<p class="soft"><small>Bu kasa tutma ihtimali %{{ (current.min_prob * 100)|round|int }} altındaki seçimleri oynamaz (<a href="/ayarlar#kasa-siniri">değiştir</a>).</small></p>{% endif %}
 <div class="stats">
   <div class="stat"><small>Bakiye</small><b>{{ current.balance|tl }}</b></div>
   <div class="stat"><small>Başlangıç</small><b>{{ current.start_balance|tl }}</b></div>

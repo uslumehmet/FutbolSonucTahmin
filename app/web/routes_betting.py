@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from app.betting.coupon import build_coupons, save_coupon
 from app.betting.selection import eligible, match_candidates
 from app.betting.settlement import wallet_stats
-from app.betting.wallets import OWNER_LABELS, WalletError, create_wallet, delete_wallet, place_bet, reset_wallet
+from app.betting.wallets import OWNER_LABELS, WalletError, check_min_prob, create_wallet, delete_wallet, place_bet, reset_wallet
 from app.config import TZ, get_settings
 from app.models import Bet, Coupon, Match, Wallet
 from app.web.views import DAY_LABELS, day_window
@@ -38,15 +38,26 @@ def _competitions(session):
     return session.query(Competition).filter(Competition.kind != "hidden").all()
 
 
-def _available_leagues(s, now) -> list[tuple[str, str, int]]:
-    """Önümüzdeki günlerde oranı ve tahmini olan maçı bulunan ligler: (kod, ad, maç sayısı)."""
+def _available_leagues(s, now) -> list[dict]:
+    """Önümüzdeki 3 günde maçı olan ligler. Oranı ve tahmini gelmiş maç sayısı (ready) seçilebilir;
+    oranı henüz gelmemiş maçlar (waiting) ücretsiz API planında maçtan yaklaşık bir gün önce gelir."""
     start, end = day_window(now, "3gun")
-    cands = match_candidates(s, max(start, now), end, get_settings(s))
-    counts: dict[str, list] = {}
-    for m in s.query(Match).filter(Match.id.in_(list(cands))):
-        entry = counts.setdefault(m.competition.code, [m.competition.name, 0])
-        entry[1] += 1
-    return [(code, name, n) for code, (name, n) in sorted(counts.items(), key=lambda kv: -kv[1][1])]
+    start = max(start, now)
+    ready_ids = set(match_candidates(s, start, end, get_settings(s)))
+    leagues: dict[str, dict] = {}
+    for m in (s.query(Match).filter(Match.status == "scheduled", Match.unmatched.is_(False),
+                                    Match.kickoff_utc >= start, Match.kickoff_utc < end)
+              .order_by(Match.kickoff_utc)):
+        if m.competition.kind == "hidden":
+            continue
+        e = leagues.setdefault(m.competition.code, {"code": m.competition.code, "name": m.competition.name,
+                                                    "ready": 0, "waiting": 0, "first_waiting": None})
+        if m.id in ready_ids:
+            e["ready"] += 1
+        else:
+            e["waiting"] += 1
+            e["first_waiting"] = e["first_waiting"] or m.kickoff_utc
+    return sorted(leagues.values(), key=lambda e: (-e["ready"], e["first_waiting"] or now, e["name"]))
 
 
 @router.get("/kupon", response_class=HTMLResponse)
@@ -183,12 +194,19 @@ def wallets_page(request: Request):
         return _render(request, "kasalar.html", {"nav": "kasalar", "rows": rows, "owner_labels": OWNER_LABELS})
 
 
+def _percent(raw: str) -> float | None:
+    """Formdaki yüzde ("75", "%75", "75,5") → 0,75. Boşsa None. Sayı değilse ValueError."""
+    raw = str(raw or "").strip().replace("%", "").replace(",", ".")
+    return float(raw) / 100 if raw else None
+
+
 @router.post("/kasalar")
 def wallet_create(request: Request, ad: str = Form(""), oynayan: str = Form("user"), baslangic: str = Form("0"),
-                  kural: str = Form("percent"), deger: str = Form("3")):
+                  kural: str = Form("percent"), deger: str = Form("3"), min_ihtimal: str = Form("")):
     with request.app.state.sf() as s:
         try:
-            w = create_wallet(s, ad, oynayan, int(float(baslangic)), stake_rule=kural, stake_value=float(deger))
+            w = create_wallet(s, ad, oynayan, int(float(baslangic)), stake_rule=kural, stake_value=float(deger),
+                              min_prob=_percent(min_ihtimal))
         except ValueError:
             return _go("/kasalar", hata="Başlangıç parası ve tutar sayı olmalı.")
         except WalletError as exc:
@@ -211,6 +229,26 @@ def wallet_rule(request: Request, wallet_id: int, kural: str = Form("percent"), 
         w.stake_rule, w.stake_value = kural, value
         s.commit()
         return _go("/kasalar", mesaj=f"{w.name} tutar kuralı güncellendi.")
+
+
+@router.post("/kasalar/{wallet_id}/ihtimal")
+def wallet_min_prob(request: Request, wallet_id: int, min_ihtimal: str = Form(""), geri: str = Form("kasalar")):
+    back = "/ayarlar#kasa-siniri" if geri == "ayarlar" else "/kasalar"
+    with request.app.state.sf() as s:
+        w = s.get(Wallet, wallet_id)
+        if w is None:
+            raise HTTPException(404)
+        if w.owner == "user":
+            return _go(back, hata="Kendi kasanızda kuponu siz seçersiniz; bu sınır sistem kasaları için.")
+        try:
+            w.min_prob = check_min_prob(_percent(min_ihtimal))
+        except ValueError:
+            return _go(back, hata="En düşük tutma ihtimali sayı olmalı (ör. 75).")
+        except WalletError as exc:
+            return _go(back, hata=str(exc))
+        s.commit()
+        text = f"en az %{round(w.min_prob * 100)}" if w.min_prob else "sınır yok"
+        return _go(back, mesaj=f"{w.name}: en düşük tutma ihtimali {text}. Bir sonraki otomatik oyundan itibaren geçerli.")
 
 
 @router.post("/kasalar/{wallet_id}/ad")

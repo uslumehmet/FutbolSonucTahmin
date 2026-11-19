@@ -19,16 +19,27 @@ class WalletError(Exception):
     pass
 
 
+def check_min_prob(min_prob: float | None) -> float | None:
+    """En düşük tutma ihtimali: boş ya da 0 → sınır yok; aksi hâlde 0 ile 1 arası (0,75 = %75)."""
+    if min_prob is None or min_prob == 0:
+        return None
+    if not 0 < min_prob < 1:
+        raise WalletError("En düşük tutma ihtimali %1 ile %99 arasında olmalı")
+    return round(float(min_prob), 4)
+
+
 def create_wallet(session, name: str, owner: str, start_tl: int, stake_rule: str = "percent",
-                  stake_value: float = 3.0) -> Wallet:
+                  stake_value: float = 3.0, min_prob: float | None = None) -> Wallet:
     if owner not in OWNER_LABELS:
         raise WalletError("Geçersiz oynayan")
+    min_prob = check_min_prob(min_prob)
     if int(start_tl) < 1:
         raise WalletError("Başlangıç parası en az 1 ₺ olmalı")
     if stake_rule not in ("percent", "fixed") or float(stake_value) <= 0:
         raise WalletError("Geçersiz tutar kuralı")
     w = Wallet(name=name.strip() or "Kasa", owner=owner, start_balance=int(start_tl) * 100,
-               balance=int(start_tl) * 100, stake_rule=stake_rule, stake_value=float(stake_value), busted=False)
+               balance=int(start_tl) * 100, stake_rule=stake_rule, stake_value=float(stake_value), busted=False,
+               min_prob=min_prob if owner != "user" else None)
     session.add(w)
     session.commit()
     return w

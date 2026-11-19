@@ -15,7 +15,7 @@
           <input type="text" name="ad" value="{{ w.name }}" maxlength="60" required aria-label="Kasa adı" title="Adı değiştirmek için tıklayın">
           <button class="btn small" type="submit">Kaydet</button>
         </form>
-        <small><a href="/kuponlarim?kasa={{ w.id }}">kuponları</a>{% if w.busted %} · <span class="wallet-busted">battı</span>{% endif %}</small>
+        <small><a href="/kuponlarim?kasa={{ w.id }}">kuponları</a>{% if w.min_prob %} · en az %{{ (w.min_prob * 100)|round|int }} ihtimal{% endif %}{% if w.busted %} · <span class="wallet-busted">battı</span>{% endif %}</small>
       </td>
       <td>{{ owner_labels[w.owner] }}</td>
       <td class="num">{{ w.start_balance|tl }}</td>
@@ -44,8 +44,10 @@
     <label>Başlangıç (₺) <input type="number" name="baslangic" min="1" step="1" value="500" style="width:7rem"></label>
     <label>Tutar kuralı <select name="kural"><option value="percent">Bakiyenin yüzdesi</option><option value="fixed">Sabit ₺</option></select></label>
     <label>Değer <input type="number" name="deger" min="0.5" step="0.5" value="3" style="width:5rem"></label>
+    <label>En düşük tutma ihtimali (%) <input type="text" inputmode="decimal" name="min_ihtimal" placeholder="yok" size="4"></label>
     <button class="btn" type="submit">Kasa aç</button>
   </form>
+  <p class="soft"><small>En düşük tutma ihtimali sadece sistem kasaları için: 75 yazarsanız bu kasa %75'in altındaki seçimleri oynamaz. Boş bırakırsanız sınır yok. Sonradan <a href="/ayarlar#kasa-siniri">Ayarlar</a>'dan değiştirebilirsiniz.</small></p>
   <p class="soft"><small>Örnek: aynı başlangıç parasıyla %2 ve %5 kurallı iki kasa açarak hangi tutar kuralının daha iyi gittiğini karşılaştırabilirsiniz.</small></p>
 </section>
 {% endblock %}

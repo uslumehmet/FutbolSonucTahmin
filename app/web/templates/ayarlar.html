@@ -47,6 +47,44 @@
   </form>
 </section>
 
+<section class="panel" id="kasa-siniri">
+  <h2>Kasalara göre en düşük tutma ihtimali</h2>
+  <p>Bir sistem kasasına sınır koyarsanız, o kasa otomatik oyunda ihtimali bu sınırın altında kalan seçimleri oynamaz.
+    Örneğin 75 yazarsanız o kasanın kuponlarındaki her maçın tutma ihtimali en az %75 olur. Boş bırakılan kasada sınır yoktur.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Kasa</th><th>Mod</th><th>En düşük tutma ihtimali</th></tr>
+    {% for w in system_wallets %}
+    <tr>
+      <td>{{ w.name }}{% if w.busted %} <span class="wallet-busted">battı</span>{% endif %}</td>
+      <td>{{ 'Güvenli' if w.owner == 'safe' else 'Değerli' }}</td>
+      <td><form class="inline-form" style="margin:0" method="post" action="/kasalar/{{ w.id }}/ihtimal">
+        <input type="hidden" name="geri" value="ayarlar">
+        <label>% <input type="text" inputmode="decimal" name="min_ihtimal" size="4"
+          value="{{ (w.min_prob * 100)|round|int if w.min_prob else '' }}" placeholder="yok" aria-label="{{ w.name }}: en düşük tutma ihtimali (yüzde)"></label>
+        <button class="btn small light" type="submit">Kaydet</button>
+      </form></td>
+    </tr>
+    {% endfor %}
+  </table></div>
+  <p class="soft"><small>Sınır yükseldikçe kuponlar daha düşük oranlı seçimlerle kurulur; bazı günler hedef orana ulaşılamaz ve o kasa o gün oynamaz.
+    Sınırlı kasaların ayrı kuponları Performans'taki Güvenli–Değerli karşılaştırmasına girmez; kasanın kendi sonucu Kasalar ve Performans'ta görünür.
+    Yeni kasayı <a href="/kasalar">Kasalar</a> sayfasından açarken de sınır verebilirsiniz.</small></p>
+
+  <details class="sub">
+    <summary>Güvenli ve Değerli seçim şu an nasıl belirleniyor?</summary>
+    <p><b>Güvenli:</b> Her maçın bahislerinden oranı en az {{ s.safe_min_odds }} olanlar alınır.
+      Modelin ihtimali piyasanınkinden {{ (s.max_model_gap * 100)|round|int }} puandan fazla yüksekse o bahis alınmaz (büyük fark genelde model hatasıdır).
+      {% if s.safe_skip_low_data %}Verisi az maçlar alınmaz. {% endif %}Kupon, kalanlar arasından tutma ihtimali en yüksek kombinasyonla kurulur.
+      Varsayılan olarak <b>en düşük tutma ihtimali sınırı yoktur</b>.</p>
+    <p><b>Değerli:</b> Tutma ihtimali en az %{{ (s.value_min_prob * 100)|round|int }} ve değeri (ihtimal × oran − 1) en az %{{ (s.value_min_edge * 100)|round|int }} olan bahisler alınır; aynı model–piyasa sınırı geçerlidir.</p>
+    {% if pick_range %}<p>Şimdiye kadar sistemin otomatik kuponlarındaki seçimlerin tutma ihtimali:</p>
+    <ul>{% for mode, r in pick_range.items() %}
+      <li>{{ 'Güvenli' if mode == 'safe' else 'Değerli' }}: en düşük {{ r.min|pct }}, ortalama {{ r.avg|pct }}, en yüksek {{ r.max|pct }} ({{ r.n }} seçim)</li>
+    {% endfor %}</ul>{% endif %}
+    <p class="soft"><small>Bu kuralların sayıları yukarıdaki "Seçim ve kupon kuralları" bölümünden değişir.</small></p>
+  </details>
+</section>
+
 <section class="panel" id="eslestirme">
   <h2>Eşleşmeyen takımlar</h2>
   {% if unmatched %}

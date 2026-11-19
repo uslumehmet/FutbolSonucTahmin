@@ -74,9 +74,9 @@ def build_coupons(cands_by_match: dict[int, list[Candidate]], target: float, max
 
 
 def save_coupon(session, draft: CouponDraft, mode: str, target: float, source: str, play_date: date,
-                status: str = "open") -> Coupon:
+                status: str = "open", min_prob: float | None = None) -> Coupon:
     coupon = Coupon(mode=mode, source=source, target_odds=target, total_odds=round(draft.total_odds, 4),
-                    prob=draft.prob, status=status, play_date=play_date)
+                    prob=draft.prob, status=status, play_date=play_date, min_prob=min_prob)
     coupon.picks = [CouponPick(match_id=p.match_id, market=p.market, odds=p.odds, prob=p.prob) for p in draft.picks]
     session.add(coupon)
     session.commit()

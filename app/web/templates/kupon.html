@@ -26,9 +26,12 @@
     </div>
     <fieldset style="border:0;padding:0;margin:0">
       <legend><b>Ligler</b></legend>
-      {% if leagues %}
-        {% for code, name, n in leagues %}<label style="display:block"><input type="checkbox" name="lig" value="{{ code }}"> {{ name }} ({{ n }} maç)</label>{% endfor %}
-      {% else %}<small class="soft">Şu an oranı olan maç yok. Oranlar her sabah güncellenir;<br>ücretsiz plan yalnızca bugünün ve yarının maçlarını verir.</small>{% endif %}
+      {% for lg in leagues if lg.ready %}<label style="display:block"><input type="checkbox" name="lig" value="{{ lg.code }}"> {{ lg.name }} ({{ lg.ready }} maç){% if lg.waiting %} <small class="soft">· {{ lg.waiting }} maçın oranı henüz yok</small>{% endif %}</label>{% endfor %}
+      {% if not leagues|selectattr('ready')|list %}<small class="soft">Şu an oranı gelmiş maç yok.</small>{% endif %}
+      {% set later = leagues|rejectattr('ready')|list %}
+      {% if later %}<div class="soft league-later"><small>Oranı henüz gelmeyenler (ücretsiz API oranları maçtan yaklaşık 1 gün önce verir; sabah güncellemesinde gelir):</small>
+        {% for lg in later %}<label style="display:block"><input type="checkbox" disabled> {{ lg.name }} <small>({{ lg.waiting }} maç, ilki {{ lg.first_waiting|local_day }})</small></label>{% endfor %}
+      </div>{% endif %}
     </fieldset>
   </div>
   <p class="soft"><small><b>Güvenli</b>: tutma ihtimali en yüksek seçimler. <b>Değerli</b>: ihtimali yüksek ve oranı hak ettiğinden fazla olan seçimler. Hiçbir lig işaretlemezseniz hepsi dahil.</small></p>

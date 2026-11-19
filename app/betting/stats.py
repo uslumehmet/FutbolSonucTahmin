@@ -16,7 +16,7 @@ def _unit(rows: list[tuple[str, float]]) -> dict:
 
 
 def mode_stats(session, mode: str) -> dict:
-    coupons = session.query(Coupon).filter_by(mode=mode, source="auto").all()
+    coupons = session.query(Coupon).filter_by(mode=mode, source="auto").filter(Coupon.min_prob.is_(None)).all()
     out = _unit([(c.status, c.settled_odds or 0.0) for c in coupons])
     out["open"] = sum(1 for c in coupons if c.status == "open")
     by_target: dict[float, list] = {}

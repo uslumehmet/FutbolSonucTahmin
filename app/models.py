@@ -163,6 +163,8 @@ class Wallet(Base):
     stake_value: Mapped[float] = mapped_column(Float, default=3.0)
     busted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    # Sistem kasası bu ihtimalin altındaki seçimleri oynamaz (0,75 = %75). Boşsa sınır yok.
+    min_prob: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
 class Coupon(Base):
@@ -177,6 +179,9 @@ class Coupon(Base):
     settled_odds: Mapped[float | None] = mapped_column(Float, nullable=True)
     play_date: Mapped[date] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    # Sadece en düşük ihtimal sınırı olan kasalar için kurulan otomatik kuponlarda dolu.
+    # Performans'taki mod karşılaştırması bu kuponları saymaz (mod sonuçları sınırsız kuponlarla ölçülür).
+    min_prob: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     picks: Mapped[list["CouponPick"]] = relationship(
         back_populates="coupon", cascade="all, delete-orphan", order_by="CouponPick.id"

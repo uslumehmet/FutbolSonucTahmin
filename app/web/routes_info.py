@@ -76,7 +76,21 @@ def _settings_ctx(s, probe_result=None):
     return {"nav": "ayarlar", "s": get_settings(s), "key_hint": (key[:4] + "…" + key[-2:]) if key else None,
             "used": api.used_today(), "limit": api.daily_limit, "month_mb": api.month_bytes() / 1_048_576,
             "last_update": get_value(s, "last_update"), "last_settle": get_value(s, "last_settle"),
-            "last_autoplay": get_value(s, "last_autoplay"), "unmatched": _unmatched(s), "probe": probe_result}
+            "last_autoplay": get_value(s, "last_autoplay"), "unmatched": _unmatched(s), "probe": probe_result,
+            "system_wallets": s.query(Wallet).filter(Wallet.owner != "user").order_by(Wallet.owner, Wallet.id).all(),
+            "pick_range": _pick_range(s)}
+
+
+def _pick_range(s) -> dict:
+    """Şimdiye kadar otomatik kuponlardaki seçimlerin tutma ihtimali: en düşük, ortalama, en yüksek (mod başına)."""
+    from sqlalchemy import func
+
+    from app.models import CouponPick
+    rows = (s.query(Coupon.mode, func.min(CouponPick.prob), func.avg(CouponPick.prob), func.max(CouponPick.prob),
+                    func.count(CouponPick.id))
+            .join(CouponPick, CouponPick.coupon_id == Coupon.id)
+            .filter(Coupon.source == "auto", Coupon.min_prob.is_(None)).group_by(Coupon.mode).order_by(Coupon.mode))
+    return {mode: {"min": lo, "avg": avg, "max": hi, "n": n} for mode, lo, avg, hi, n in rows}
 
 
 @router.get("/ayarlar", response_class=HTMLResponse)

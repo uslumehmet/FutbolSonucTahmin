@@ -206,3 +206,37 @@ def test_kuponlarim_pick_opens_match_review(client_seeded, session_factory):
     assert "<b>Ev sahibi 1.5 Alt</b>" in html and f"({home} golleri)" in html
     assert f"{home} en fazla 1 gol atmalı" in html and f"Maç 2–3 bitti; {home} 2 gol attı." in html
     assert f'href="/mac/{m.id}"' in html
+
+
+def test_wallet_min_prob_from_settings_and_new_wallet(client_seeded, session_factory):
+    with session_factory() as s:
+        w = s.query(Wallet).filter_by(name="Sistem · Güvenli 1.000 ₺").one()
+    page = client_seeded.get("/ayarlar").text
+    assert "Kasalara göre en düşük tutma ihtimali" in page and f'action="/kasalar/{w.id}/ihtimal"' in page
+    assert "en düşük tutma ihtimali sınırı yoktur" in page
+    r = client_seeded.post(f"/kasalar/{w.id}/ihtimal", data={"min_ihtimal": "75", "geri": "ayarlar"},
+                           follow_redirects=True)
+    assert "en az %75" in r.text and 'value="75"' in r.text
+    with session_factory() as s:
+        assert s.get(Wallet, w.id).min_prob == 0.75
+    r = client_seeded.post(f"/kasalar/{w.id}/ihtimal", data={"min_ihtimal": "150"}, follow_redirects=True)
+    assert "%1 ile %99" in r.text
+    client_seeded.post(f"/kasalar/{w.id}/ihtimal", data={"min_ihtimal": ""}, follow_redirects=True)
+    with session_factory() as s:
+        assert s.get(Wallet, w.id).min_prob is None
+    r = client_seeded.post("/kasalar", data={"ad": "Güvenli %80", "oynayan": "safe", "baslangic": "1000",
+                                             "kural": "percent", "deger": "10", "min_ihtimal": "80"},
+                           follow_redirects=True)
+    assert "en az %80 ihtimal" in r.text
+    with session_factory() as s:
+        assert s.query(Wallet).filter_by(name="Güvenli %80").one().min_prob == 0.8
+
+
+def test_coupon_form_shows_leagues_waiting_for_odds(client_seeded, session_factory):
+    from app.models import OddsQuote
+    with session_factory() as s:
+        s.query(OddsQuote).delete()
+        s.commit()
+    html = client_seeded.get("/kupon").text  # oran yok: ligler seçilemez ama görünür
+    assert "Oranı henüz gelmeyenler" in html and "Premier League" in html
+    assert 'name="lig" value="E0"' not in html

@@ -131,3 +131,34 @@ def test_autoplay_creates_default_wallets_if_missing(session):
     rep = run_autoplay(session, NOW)
     assert session.query(Wallet).count() == 5
     assert rep.coupons == 0 or rep.bets > 0
+
+
+def test_wallet_min_prob_plays_only_picks_above_limit(session):
+    _ready(session)
+    w = create_wallet(session, "Güvenli %75", "safe", 1000, min_prob=0.75)
+    rep = run_autoplay(session, NOW)
+    picked = (session.query(CouponPick).join(Coupon, CouponPick.coupon_id == Coupon.id)
+              .join(Bet, Bet.coupon_id == Coupon.id).filter(Bet.wallet_id == w.id).all())
+    assert all(p.prob >= 0.75 for p in picked)
+    # sınırlı kasa için ayrı kuponlar Performans'taki mod karşılaştırmasına girmez
+    default_safe = session.query(Coupon).filter_by(mode="safe", min_prob=None).count()
+    assert default_safe == len(session.query(Wallet).filter_by(name="Sistem · Güvenli 100 ₺").one().bets) \
+        if hasattr(Wallet, "bets") else default_safe >= 1
+    limited = session.query(Coupon).filter(Coupon.min_prob == 0.75).all()
+    assert all(all(p.prob >= 0.75 for p in c.picks) for c in limited)
+    assert rep.coupons == session.query(Coupon).count()
+
+
+def test_wallet_min_prob_too_high_plays_nothing_and_says_why(session):
+    _ready(session)
+    w = create_wallet(session, "Güvenli %99", "safe", 1000, min_prob=0.99)
+    rep = run_autoplay(session, NOW)
+    assert session.query(Bet).filter_by(wallet_id=w.id).count() == 0
+    assert any("en az %99" in x for x in rep.skipped)
+    assert session.query(Coupon).filter_by(mode="safe").count() >= 1  # diğer Güvenli kasalar oynamaya devam eder
+
+
+def test_create_wallet_rejects_bad_min_prob(session):
+    from app.betting.wallets import WalletError
+    with pytest.raises(WalletError):
+        create_wallet(session, "X", "safe", 100, min_prob=1.2)
