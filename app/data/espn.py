@@ -239,6 +239,7 @@ def _num(value):
         return float(value)
     except (TypeError, ValueError):
         return None
+SLIM_ABOVE = 50_000  # bundan büyük önbellek dosyası küçük kopyasıyla değiştirilir
 
 
 def parse_summary(text: str) -> dict:
@@ -271,7 +272,114 @@ def parse_summary(text: str) -> dict:
               for p in r.get("roster") or [] if p.get("starter") and p.get("athlete")]
         if side in ("home", "away") and len(xi) >= 10:
             out[f"xi_{side}"] = xi
+    out.update(parse_odds(data))
     return out or {"summary": "yok"}
+
+
+_B365 = {"preMatchFullTimeResultHome": "MS1", "preMatchFullTimeResultDraw": "MSX",
+         "preMatchFullTimeResultAway": "MS2", "preMatchDoubleChanceHomeOrDraw": "CS1X",
+         "preMatchDoubleChanceHomeOrAway": "CS12", "preMatchDoubleChanceDrawOrAway": "CSX2"}
+_OU_LINES = {"1.5": "15", "2.5": "25", "3.5": "35"}
+
+
+def _american(v) -> float | None:
+    """Amerikan oranını (+400, -160) ondalık orana çevirir."""
+    try:
+        x = float(str(v).replace("+", ""))
+    except (TypeError, ValueError):
+        return None
+    if x >= 100:
+        return round(1 + x / 100, 3)
+    if x <= -100:
+        return round(1 + 100 / -x, 3)
+    return None
+
+
+def _fraction(v) -> float | None:
+    """İngiliz oranını ("17/4") ondalık orana çevirir."""
+    try:
+        a, b = str(v).split("/")
+        return round(1 + float(a) / float(b), 3)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
+def parse_odds(data: dict) -> dict:
+    """Maç öncesi oranlar (ondalık): {"odds_dk": {"open": {...}, "close": {...}}, "odds_b365": {...}}.
+
+    DraftKings için açılış ve kapanış 1X2 ile alt/üst; Bet365 için maç öncesi 1X2, çifte şans ve alt/üst.
+    Alt/üstte yalnızca 1.5/2.5/3.5 çizgileri alınır (tam sayılı çizgide iade olur, bizim marketlerimize uymaz).
+    """
+    out: dict = {}
+    for o in data.get("odds") or []:
+        name = (o.get("provider") or {}).get("name") or ""
+        if name == "DraftKings":
+            dk = {}
+            ml, tot = o.get("moneyline") or {}, o.get("total") or {}
+            for when in ("open", "close"):
+                row = {}
+                for side, key in (("home", "MS1"), ("draw", "MSX"), ("away", "MS2")):
+                    odd = _american(((ml.get(side) or {}).get(when) or {}).get("odds"))
+                    if odd:
+                        row[key] = odd
+                for side, key in (("over", "UST"), ("under", "ALT")):
+                    q = (tot.get(side) or {}).get(when) or {}
+                    line = _OU_LINES.get(str(q.get("line") or "")[1:])
+                    odd = _american(q.get("odds"))
+                    if line and odd:
+                        row[key + line] = odd
+                if row:
+                    dk[when] = row
+            if dk:
+                out["odds_dk"] = dk
+        elif name.startswith("Bet 365"):
+            team = ((o.get("bettingOdds") or {}).get("teamOdds")) or {}
+            row = {}
+            for field_, key in _B365.items():
+                odd = _fraction((team.get(field_) or {}).get("value"))
+                if odd:
+                    row[key] = odd
+            line = _OU_LINES.get(str((team.get("preMatchOverUnderHandicap") or {}).get("value") or ""))
+            for field_, key in (("preMatchGoalLineOver", "UST"), ("preMatchGoalLineUnder", "ALT")):
+                odd = _fraction((team.get(field_) or {}).get("value"))
+                if line and odd:
+                    row[key + line] = odd
+            if row:
+                out["odds_b365"] = row
+    return out
+
+
+def slim_summary(text: str) -> str:
+    """Önbelleğe yazılacak küçük kopya: yalnızca parse_summary'nin okuduğu alanlar (dosya ~400 KB yerine ~10 KB)."""
+    data = json.loads(text)
+    comp = ((data.get("header") or {}).get("competitions") or [{}])[0]
+    slim = {
+        "header": {"competitions": [{"date": comp.get("date"), "competitors": [
+            {"homeAway": c.get("homeAway"), "team": {"id": (c.get("team") or {}).get("id")}}
+            for c in comp.get("competitors") or []]}]},
+        "boxscore": {"teams": [
+            {"team": {"id": (t.get("team") or {}).get("id")},
+             "statistics": [{"name": s.get("name"), "displayValue": s.get("displayValue")}
+                            for s in t.get("statistics") or []]}
+            for t in (data.get("boxscore") or {}).get("teams") or []]},
+        "rosters": [
+            {"homeAway": r.get("homeAway"), "team": {"id": (r.get("team") or {}).get("id")},
+             "roster": [{"starter": True, "athlete": {"id": (p.get("athlete") or {}).get("id"),
+                                                      "displayName": (p.get("athlete") or {}).get("displayName")},
+                         "position": {"abbreviation": (p.get("position") or {}).get("abbreviation")}}
+                        for p in r.get("roster") or [] if p.get("starter") and p.get("athlete")]}
+            for r in data.get("rosters") or []],
+        "odds": [],
+    }
+    for o in data.get("odds") or []:
+        name = (o.get("provider") or {}).get("name") or ""
+        if name == "DraftKings":
+            slim["odds"].append({"provider": {"name": name}, "moneyline": o.get("moneyline"), "total": o.get("total")})
+        elif name.startswith("Bet 365"):
+            team = ((o.get("bettingOdds") or {}).get("teamOdds")) or {}
+            slim["odds"].append({"provider": {"name": name}, "bettingOdds": {"teamOdds": {
+                k: {"value": v.get("value")} for k, v in team.items() if k.startswith("preMatch")}}})
+    return json.dumps(slim, ensure_ascii=False, separators=(",", ":"))
 
 
 @dataclass
@@ -318,17 +426,19 @@ def ingest_summaries(session, codes: list[str] | None = None, seasons: list[int]
     def get(job):
         m, url, dest = job
         try:
-            return m, fetch(url, dest, None), None
+            return m, dest, fetch(url, dest, None), None
         except (httpx.HTTPError, OSError) as exc:
-            return m, None, exc
+            return m, dest, None, exc
 
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        for i, (m, text, exc) in enumerate(pool.map(get, jobs), 1):
+        for i, (m, dest, text, exc) in enumerate(pool.map(get, jobs), 1):
             if exc is not None:
                 rep.errors.append(f"{m.id}: {exc}")
                 continue
             try:
                 parsed = parse_summary(text)
+                if len(text) > SLIM_ABOVE:
+                    dest.write_text(slim_summary(text), encoding="utf-8")
             except (ValueError, KeyError, TypeError) as e:
                 rep.errors.append(f"{m.id}: çözülemedi ({e})")
                 continue

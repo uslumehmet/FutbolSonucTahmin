@@ -172,3 +172,35 @@ def test_ingest_summaries_fills_stats_once(session, tmp_espn):
     assert rep.matches == 1 and rep.with_stats == 1 and rep.with_lineups == 1
     assert api.stats["sot"] == [6, 4] and api.stats["summary"] == "ok" and api.stats["espn_id"] == "777"
     assert ingest_summaries(session, fetch=fetch).matches == 0 and len(calls) == 1  # bir daha istenmez
+
+
+ODDS = [{"provider": {"name": "DraftKings"}, "links": ["x"] * 50,
+         "moneyline": {"home": {"close": {"odds": "+400"}, "open": {"odds": "+390"}},
+                       "away": {"close": {"odds": "-160"}, "open": {"odds": "-165"}},
+                       "draw": {"close": {"odds": "+320"}, "open": {"odds": "+310"}}},
+         "total": {"over": {"close": {"line": "o2.5", "odds": "-160"}}, "under": {"close": {"line": "u2.5", "odds": "+130"}}}},
+        {"provider": {"name": "Bet 365"}, "bettingOdds": {"teamOdds": {
+            "preMatchFullTimeResultHome": {"value": "17/4"}, "preMatchFullTimeResultDraw": {"value": "31/10"},
+            "preMatchFullTimeResultAway": {"value": "8/13"}, "preMatchDoubleChanceHomeOrDraw": {"value": "5/4"},
+            "preMatchOverUnderHandicap": {"value": "3"}, "preMatchGoalLineOver": {"value": "39/40"},
+            "liveFullTimeResultHome": {"value": "1/200"}}}}]
+
+
+def test_parse_odds_converts_to_decimal_and_skips_whole_lines():
+    from app.data.espn import parse_odds
+    out = parse_odds({"odds": ODDS})
+    assert out["odds_dk"]["close"] == {"MS1": 5.0, "MSX": 4.2, "MS2": 1.625, "UST25": 1.625, "ALT25": 2.3}
+    assert out["odds_dk"]["open"] == {"MS1": 4.9, "MSX": 4.1, "MS2": 1.606}
+    # Bet365: maç öncesi oranlar; canlı oran ve tam sayılı (iadeli) alt/üst çizgisi alınmaz
+    assert out["odds_b365"] == {"MS1": 5.25, "MSX": 4.1, "MS2": 1.615, "CS1X": 2.25}
+
+
+def test_slim_summary_keeps_what_parse_needs():
+    from app.data.espn import parse_summary, slim_summary
+    full = json.loads(_summary())
+    full["odds"] = ODDS
+    full["commentary"] = ["uzun metin"] * 1000
+    text = json.dumps(full)
+    slim = slim_summary(text)
+    assert len(slim) < len(text) / 3
+    assert parse_summary(slim) == parse_summary(text)
