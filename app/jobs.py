@@ -107,8 +107,30 @@ def settle_job(sf, now: datetime) -> None:
     from app.data.ingest_api import ingest_results
 
     with _LOCK, sf() as s:
-        ingest_results(s, make_api(s), now)
+        api = make_api(s)
+        ingest_results(s, api, now)
         _report(s, "last_settle", settle_all(s, now), now)
+        try:  # artan kotayla maça yakın oranlar; hata verirse sonuçlandırma etkilenmez
+            late_odds_update(s, api, now)
+        except Exception:  # noqa: BLE001
+            log.exception("maça yakın oran yenileme hatası")
+
+
+def late_odds_update(s, api, now: datetime) -> int:
+    """Maçına birkaç saat kalan maçların oranını yeniler ve tahminlerini oranla yeniden birleştirir."""
+    from app.data.ingest_api import refresh_late_odds
+    from app.model.predict import _store, predict_match
+    from app.model.store import ModelStore
+    from app.models import Match
+
+    ids = refresh_late_odds(s, api, now)
+    if ids:
+        store = ModelStore(s)
+        for mid in ids:
+            _store(s, predict_match(s, store, s.get(Match, mid), now), now)
+        s.commit()
+        set_value(s, "last_late_odds", {"at": now.isoformat(), "matches": len(ids)})
+    return len(ids)
 
 
 def refresh_sources(sf, now: datetime) -> None:

@@ -12,7 +12,8 @@ from app.data.ingest import competition_teams, find_match, ingest_openfootball, 
 from app.data.teams import add_alias, resolve_team
 from app.models import Competition, Match, MissingPlayer, OddsQuote, PlayerSeasonStat, Team
 
-MAX_PLAYER_LOOKUPS = 20
+MAX_PLAYER_LOOKUPS = 60  # eksik oyuncu istatistiği: bir güncellemede en fazla bu kadar istek (sakin günlerde)
+API_RESERVE = 15  # günün geri kalanındaki sonuçlandırma çalıştırmaları için bırakılan istek
 ODDS_REFRESH_HOURS = 20
 # Ücretsiz plan bu sezonun oyuncu istatistiğini vermiyorsa izin verilen son sezon kullanılır;
 # takım toplamları o zaman genel bir lig ortalamasıyla yaklaşık alınır.
@@ -146,15 +147,31 @@ def _store_injuries(session, items: list[dict], fixtures: dict[int, Match], rep:
     session.commit()
 
 
-def _fetch_player_stats(session, api, rep: IngestReport) -> None:
-    rows = (session.query(MissingPlayer, Match).join(Match, MissingPlayer.match_id == Match.id)
-            .filter(MissingPlayer.source == "api", MissingPlayer.api_player_id.isnot(None)).all())
+def player_lookup_budget(api) -> int:
+    """Oyuncu istatistiği için harcanabilecek istek: oranlar ve eksikler alındıktan sonra kotada kalan,
+    sonuçlandırma payı (API_RESERVE) düşülerek. Yoğun maç günlerinde kendiliğinden azalır, kota bitmez."""
+    try:
+        left = int(api.daily_limit) - int(api.used_today())
+    except (AttributeError, TypeError, ValueError):
+        return 0
+    return max(0, min(MAX_PLAYER_LOOKUPS, left - API_RESERVE))
+
+
+def _fetch_player_stats(session, api, rep: IngestReport, now: datetime | None = None) -> None:
+    q = (session.query(MissingPlayer, Match).join(Match, MissingPlayer.match_id == Match.id)
+         .filter(MissingPlayer.source == "api", MissingPlayer.api_player_id.isnot(None),
+                 MissingPlayer.active.is_(True)))
+    if now is not None:
+        q = q.filter(Match.kickoff_utc >= now)  # oynanmış maçların eksikleri artık tahmini değiştirmez
+    rows = q.order_by(Match.kickoff_utc).all()  # önce en yakın maçlar
+    budget = player_lookup_budget(api)
     done = 0
     for mp, m in rows:
-        if done >= MAX_PLAYER_LOOKUPS:
-            break
         if session.get(PlayerSeasonStat, (mp.api_player_id, m.season)) is not None:
             continue
+        if done >= budget:
+            rep.fallbacks.append(f"oyuncu istatistikleri: günlük kota payı doldu ({done} istek), kalanlar sonraki güncellemede")
+            break
         team = session.get(Team, mp.team_id)
         approx = False
         try:
@@ -240,8 +257,52 @@ def ingest_upcoming(session, api, now: datetime, days: int = 2) -> IngestReport:
             rep.errors.append(f"eksik hatası {d}: {exc}")
             continue
         _store_injuries(session, items, fixtures, rep)
-    _fetch_player_stats(session, api, rep)
+    _fetch_player_stats(session, api, rep, now)
     return rep
+
+
+LATE_ODDS_HOURS = 6  # maçına bu kadar saatten az kalan maçların oranı gün içinde yenilenir
+LATE_ODDS_MIN_AGE = timedelta(hours=3)  # bundan yeni oranı olan maç atlanır
+LATE_ODDS_RESERVE = 10  # günün kalan sonuçlandırma çalıştırmaları için bırakılan istek
+
+
+def refresh_late_odds(session, api, now: datetime) -> list[int]:
+    """Maça yakın oranları yeniler; oranı yenilenen maçların id'lerini döndürür.
+
+    Maça yakın oran sabah oranından daha isabetlidir (DraftKings ölçümü: açılış logloss 0,976, kapanış 0,969);
+    tahmin oranla birleştirildiği için bu, maç saatine yakın gösterilen ihtimali iyileştirir. Sadece günlük
+    kotadan artan istekler kullanılır; otomatik oyun sabah kurulduğu için kuponları değiştirmez.
+    """
+    if api is None:
+        return []
+    try:
+        budget = int(api.daily_limit) - int(api.used_today()) - LATE_ODDS_RESERVE
+    except (AttributeError, TypeError, ValueError):
+        return []
+    matches = (session.query(Match)
+               .filter(Match.status == "scheduled", Match.api_fixture_id.isnot(None), Match.unmatched.is_(False),
+                       Match.kickoff_utc > now + timedelta(minutes=10),
+                       Match.kickoff_utc <= now + timedelta(hours=LATE_ODDS_HOURS))
+               .order_by(Match.kickoff_utc).all())
+    rep, done = IngestReport(), []
+    for m in matches:
+        if len(done) >= budget:
+            break
+        fresh = session.query(OddsQuote).filter(OddsQuote.match_id == m.id, OddsQuote.source == "api",
+                                                OddsQuote.fetched_at >= now - LATE_ODDS_MIN_AGE).first()
+        if fresh is not None:
+            continue
+        try:
+            items = api.odds_for_fixture(m.api_fixture_id, max_age=timedelta(hours=1))
+        except QuotaExceeded:
+            break
+        except ApiError:
+            continue
+        before = rep.odds
+        _store_odds(session, items, now, rep, {m.api_fixture_id})
+        if rep.odds > before:
+            done.append(m.id)
+    return done
 
 
 def ingest_results(session, api, now: datetime, fetch=fetch_text) -> IngestReport:

@@ -1,5 +1,5 @@
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -7,7 +7,7 @@ import pytest
 
 from app.data.api_football import ApiFootball
 from app.data.api_parse import parse_api_fixture, parse_api_odds
-from app.data.ingest_api import ingest_results, ingest_upcoming
+from app.data.ingest_api import ingest_results, ingest_upcoming, refresh_late_odds
 from app.data.teams import get_or_create_team
 from app.models import ApiCall, Competition, Match, MissingPlayer, OddsQuote, PlayerSeasonStat, Team
 
@@ -228,3 +228,52 @@ def test_api_fixture_merges_into_openfootball_schedule_even_if_moved(session):
     assert m.id == planned.id
     assert m.kickoff_utc == datetime(2026, 11, 21, 15, tzinfo=UTC)
     assert session.query(Match).filter_by(competition_id=e0.id, season=2026).count() == 1
+
+
+def test_player_lookup_budget_leaves_reserve():
+    from app.data.ingest_api import API_RESERVE, MAX_PLAYER_LOOKUPS, player_lookup_budget
+
+    class Api:
+        daily_limit = 100
+
+        def __init__(self, used):
+            self.used = used
+
+        def used_today(self):
+            return self.used
+
+    assert player_lookup_budget(Api(10)) == MAX_PLAYER_LOOKUPS  # sakin gün
+    assert player_lookup_budget(Api(80)) == 100 - 80 - API_RESERVE  # yoğun gün: sonuçlandırma payı kalır
+    assert player_lookup_budget(Api(95)) == 0
+    assert player_lookup_budget(object()) == 0
+
+
+def test_player_stats_skip_when_quota_share_used(session):
+    _seed_teams(session)
+    api = make_api(session)
+    api.daily_limit = 3 + 15  # fikstür + oran + eksik isteklerinden sonra oyuncuya pay kalmaz
+    rep = ingest_upcoming(session, api, NOW, days=1)
+    assert session.get(PlayerSeasonStat, (1460, 2026)) is None
+    assert any("kota payı" in f for f in rep.fallbacks)
+
+
+def test_refresh_late_odds_near_kickoff_within_quota(session):
+    _seed_teams(session)
+    calls = []
+    api = make_api(session, calls=calls)
+    ingest_upcoming(session, api, NOW, days=1)  # 08:00 UTC; maçlar 15:00 ve 16:00
+    assert refresh_late_odds(session, api, NOW) == []  # 7 saatten fazla var
+    later = NOW + timedelta(hours=4)
+    api.clock = lambda: later
+    calls.clear()
+    ids = refresh_late_odds(session, api, later)
+    ars = session.query(Match).filter_by(api_fixture_id=9001).one()
+    assert ids == [ars.id]  # eşleşmeyen takımın maçı (tahmini yok) atlanır
+    assert len([p for path, p in calls if path.endswith("/odds")]) == 1
+    latest = session.query(OddsQuote).filter_by(market="MS1").order_by(OddsQuote.fetched_at.desc()).first()
+    assert latest.fetched_at == later
+    calls.clear()
+    assert refresh_late_odds(session, api, later) == [] and not calls  # oranlar artık taze
+    api.clock = lambda: later + timedelta(hours=1, minutes=30)
+    api.daily_limit = api.used_today() + 10  # artan kota yok: sonuçlandırma payı korunur
+    assert refresh_late_odds(session, api, later + timedelta(hours=1, minutes=30)) == []

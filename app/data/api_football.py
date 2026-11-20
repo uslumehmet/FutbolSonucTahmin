@@ -175,11 +175,11 @@ class ApiFootball:
         return self.get("/injuries", {"league": league_id, "season": season, "date": day.isoformat()},
                         timedelta(hours=6)).get("response", [])
 
-    def odds_for_fixture(self, fixture_id: int) -> list[dict]:
+    def odds_for_fixture(self, fixture_id: int, max_age: timedelta = timedelta(hours=6)) -> list[dict]:
         """Önce yalnızca Bet365 (küçük yanıt, az internet); yoksa bütün bahisçiler."""
-        items = self.get("/odds", {"fixture": fixture_id, "bookmaker": BET365_ID}, timedelta(hours=6)).get("response", [])
+        items = self.get("/odds", {"fixture": fixture_id, "bookmaker": BET365_ID}, max_age).get("response", [])
         if not items:
-            items = self.get("/odds", {"fixture": fixture_id}, timedelta(hours=6)).get("response", [])
+            items = self.get("/odds", {"fixture": fixture_id}, max_age).get("response", [])
         return items
 
     def injuries_on(self, day: date) -> list[dict]:

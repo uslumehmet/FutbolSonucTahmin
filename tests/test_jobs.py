@@ -75,3 +75,34 @@ def test_scheduler_has_periodic_catch_up(session_factory):
     sched = jobs.create_scheduler(session_factory)
     job = sched.get_job("catchup")
     assert job is not None and job.trigger.interval.total_seconds() == 1800
+
+
+def test_late_odds_update_repredicts_with_fresh_odds(session, monkeypatch):
+    from datetime import timedelta
+
+    from app.model.predict import latest_prediction
+    from app.models import Match, Prediction
+    from tests.helpers import NOW, seed_synthetic_league
+
+    ids = seed_synthetic_league(session, upcoming=1)
+    m = session.get(Match, ids[0])
+    m.api_fixture_id = 777
+    session.commit()
+
+    class Api:
+        daily_limit = 100
+
+        def used_today(self):
+            return 20
+
+        def odds_for_fixture(self, fid, max_age=None):
+            vals = [{"value": "Home", "odd": "1.50"}, {"value": "Draw", "odd": "4.20"}, {"value": "Away", "odd": "6.50"}]
+            return [{"fixture": {"id": fid}, "bookmakers": [{"id": 8, "bets": [{"name": "Match Winner", "values": vals}]}]}]
+
+    now = m.kickoff_utc - timedelta(hours=3)
+    assert jobs.late_odds_update(session, Api(), now) == 1
+    p = latest_prediction(session, m.id)
+    assert p.created_at == now and p.layers.get("piyasa") == 1
+    assert p.probs["MS1"] > 0.55  # yeni oran ev sahibini açık favori gösteriyor (1.50)
+    assert session.query(Prediction).filter_by(match_id=m.id).count() == 1
+    assert NOW < now
