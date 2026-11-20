@@ -210,3 +210,8 @@ def test_match_page_shows_stats_and_lineups(client_seeded, session_factory):
     html = client_seeded.get(f"/mac/{mid}").text
     assert "Maç istatistikleri" in html and "İsabetli şut" in html and "%58" in html
     assert "Ev Oyuncu 3" in html and "Dep Oyuncu 10" in html
+
+
+def test_match_detail_shows_model_probability_when_blended(client_seeded):
+    html = client_seeded.get(f"/mac/{client_seeded.match_ids[0]}").text
+    assert 'class="pmodel"' in html and "bahisçi oranının birleşimidir" in html

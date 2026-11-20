@@ -150,6 +150,7 @@ class Prediction(Base):
     flags: Mapped[list] = mapped_column(JSON, default=list)
     missing_snapshot: Mapped[list] = mapped_column(JSON, default=list)
     top_scores: Mapped[list] = mapped_column(JSON, default=list)
+    model_probs: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # bahisçi oranıyla birleştirmeden önce
 
 
 class Wallet(Base):

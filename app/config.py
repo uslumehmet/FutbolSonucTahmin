@@ -89,6 +89,7 @@ class Settings:
     default_stake_pct: float = 3.0
     max_model_gap: float = 0.15
     safe_skip_low_data: bool = True  # verisi az maçlar ("veri az") Güvenli moda girmez
+    use_market: bool = True  # tahmin, oran gelince bahisçi oranıyla birleştirilir (app/model/market_layer.py)
 
 
 DEFAULT_SETTINGS = Settings()

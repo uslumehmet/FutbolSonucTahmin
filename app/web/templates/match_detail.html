@@ -74,7 +74,7 @@
         <td>{% set mp = market_parts(x.key, m.home_team.name, m.away_team.name) %}<span class="help mlabel" data-tip="{{ MARKET_HELP[x.key] }}" tabindex="0" aria-label="{{ x.label }}: {{ MARKET_HELP[x.key] }}">{{ mp[0] }}{% if mp[1] %}<small class="msub">({{ mp[1] }})</small>{% endif %}</span>
           {% if picks.safe and picks.safe.market == x.key %}<span class="pick safe">Güvenli</span>{% endif %}
           {% if picks.value and picks.value.market == x.key %}<span class="pick value">Değerli</span>{% endif %}</td>
-        <td class="num"><b>{{ x.prob|pct }}</b></td>
+        <td class="num"><b>{{ x.prob|pct }}</b>{% if x.model is not none %}<small class="pmodel" data-tip="Modelin kendi tahmini (bahisçi oranıyla birleştirmeden önce)">model {{ x.model|pct }}</small>{% endif %}</td>
         <td class="num">{{ x.odds|odds }}</td>
         <td class="num"><small>{{ x.implied|pct }}</small></td>
         <td class="num {% if x.value is not none and x.value > 0 %}pos{% else %}neg{% endif %}">{{ x.value|signed_pct }}</td>
@@ -82,7 +82,7 @@
       {% endfor %}
       {% endfor %}
     </table></div>
-    <p class="soft" style="margin-top:.6rem"><small>Değer = tutma ihtimali × oran − 1. Pozitif değer, oranın modelin ihtimaline göre yüksek olduğu anlamına gelir.{% if picks.book == 'AVG' %} Bet365 oranı yok, bahisçi ortalaması kullanıldı.{% endif %}
+    <p class="soft" style="margin-top:.6rem"><small>{% if blended %}Tutma ihtimali, modelin tahmini ile bahisçi oranının birleşimidir; ölçümde ikisinden de isabetli çıktı. Altındaki küçük sayı modelin kendi tahmini.<br>{% endif %}Değer = tutma ihtimali × oran − 1. Pozitif değer, oranın modelin ihtimaline göre yüksek olduğu anlamına gelir.{% if picks.book == 'AVG' %} Bet365 oranı yok, bahisçi ortalaması kullanıldı.{% endif %}
       <br>Oranların alındığı zaman: {{ odds_time|local_dt if odds_time else 'oran yok' }} ({{ 'Bet365' if picks.book == 'B365' else 'bahisçi ortalaması' }}). Oranlar canlı değildir; her sabah güncellenir.</small></p>
     {% else %}<p class="soft">Bu maç için tahmin yok.</p>{% endif %}
   </section>

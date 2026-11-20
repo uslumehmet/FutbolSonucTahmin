@@ -125,6 +125,8 @@ async def settings_save(request: Request):
         return _go("/ayarlar", hata="Geçersiz değer: sayı girin (ör. 1.20).")
     if form.get("safe_skip_low_data_sent"):  # yalnızca bu kutuyu içeren form gönderilince değişir
         changes["safe_skip_low_data"] = bool(form.get("safe_skip_low_data"))
+    if form.get("use_market_sent"):
+        changes["use_market"] = bool(form.get("use_market"))
     if changes.get("coupon_max_picks", 6) < 1 or any(t < 1.1 for t in changes.get("autoplay_targets", (2.0,))):
         return _go("/ayarlar", hata="Geçersiz değer: maç sayısı en az 1, hedef oran en az 1,10 olmalı.")
     with request.app.state.sf() as s:

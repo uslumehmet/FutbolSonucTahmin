@@ -85,3 +85,14 @@ def test_performance_shows_league_accuracy_table(client_seeded):
     html = client_seeded.get("/performans").text
     assert "Lig lig doğruluk" in html and "Süper Lig" in html and "%50" in html and "%75" in html
     assert "%40" in html  # hep ev sahibi karşılaştırması
+
+
+def test_settings_market_toggle(client, session_factory):
+    html = client.get("/ayarlar").text
+    assert 'name="use_market"' in html and "bahisçi oranıyla birleştir" in html
+    client.post("/ayarlar", data={"use_market_sent": "1"}, follow_redirects=True)  # kutu boş
+    with session_factory() as s:
+        assert get_settings(s).use_market is False
+    client.post("/ayarlar", data={"use_market_sent": "1", "use_market": "1"}, follow_redirects=True)
+    with session_factory() as s:
+        assert get_settings(s).use_market is True

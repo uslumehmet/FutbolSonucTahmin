@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 import pytest
 
+from app.config import save_settings
 from app.data.teams import get_or_create_team
 from app.model.markets import MARKET_GROUP
 from app.model.predict import latest_prediction, predict_match, predict_upcoming
@@ -54,6 +55,7 @@ class _Fake1X2:
 
 def test_layer2_overrides_only_active_groups(session, monkeypatch):
     ids = seed_synthetic_league(session, upcoming=1)
+    save_settings(session, use_market=False)  # bu test yalnızca 2. katmanı sınar
     m = session.get(Match, ids[0])
     store = ModelStore(session)
     plain = predict_match(session, store, m, NOW)
@@ -85,3 +87,24 @@ def test_national_match_uses_elo_model(session):
     session.commit()
     p = predict_match(session, ModelStore(session), up, NOW)
     assert p.lam_home > p.lam_away and p.probs["MS1"] > p.probs["MS2"]
+
+
+def test_market_layer_blends_when_odds_exist(session):
+    ids = seed_synthetic_league(session, upcoming=2)
+    store = ModelStore(session)
+    with_odds = predict_match(session, store, session.get(Match, ids[0]), NOW)
+    assert with_odds.layers.get("piyasa") == 1 and with_odds.model_probs
+    # oranlar 2.10 / 3.40 / 3.50: piyasa ev sahibine ~%45 veriyor; birleşik tahmin piyasaya yakın
+    assert abs(with_odds.probs["MS1"] - 0.45) < abs(with_odds.model_probs["MS1"] - 0.45) + 1e-9
+    for group in ("1X2", "OU25", "BTTS", "OU15", "H05"):
+        total = sum(v for k, v in with_odds.probs.items() if MARKET_GROUP[k] == group)
+        assert total == pytest.approx(1.0)
+    assert with_odds.probs["CS1X"] == pytest.approx(with_odds.probs["MS1"] + with_odds.probs["MSX"])
+    predict_upcoming(session, store, NOW, days=3)
+    assert latest_prediction(session, ids[0]).model_probs == with_odds.model_probs
+
+
+def test_market_layer_off_or_without_odds_keeps_model(session):
+    ids = seed_synthetic_league(session, upcoming=1, with_odds=False)
+    p = predict_match(session, ModelStore(session), session.get(Match, ids[0]), NOW)
+    assert "piyasa" not in p.layers and p.model_probs is None

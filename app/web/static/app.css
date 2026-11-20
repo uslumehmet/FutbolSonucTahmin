@@ -367,6 +367,7 @@ tr.section-row th { background: var(--section); color: var(--ink); font-family: 
 .leg.won .leg-score { color: var(--good); }
 .mlabel { display: inline-flex; flex-direction: column; line-height: 1.25; }
 .msub { font-size: .8rem; font-weight: 400; }
+.pmodel { display: block; font-size: .75rem; font-weight: 400; color: var(--ink-soft); white-space: nowrap; }
 .leg-review { margin: 0 0 .6rem 2.15rem; padding: .6rem .8rem; background: var(--section); border-radius: var(--radius-s);
   font-size: .92rem; }
 .leg-review p { margin: 0 0 .4rem; }

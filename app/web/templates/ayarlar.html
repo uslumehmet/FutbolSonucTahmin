@@ -42,6 +42,13 @@
         Verisi az maçları Güvenli moda alma</label>
       <small class="soft">Lige yeni çıkan ya da geçmişi az olan takımların maçları ("veri az" etiketi). Değerli modu etkilemez.</small>
     </div>
+    <div class="inline-form">
+      <input type="hidden" name="use_market_sent" value="1">
+      <label class="check"><input type="checkbox" name="use_market" value="1" {% if s.use_market %}checked{% endif %}>
+        Tahmini bahisçi oranıyla birleştir (önerilen)</label>
+      <small class="soft">Oran gelen maçlarda tutma ihtimali, modelin tahmini ile Bet365 oranının birleşimidir. 2024–2026'daki 1.819 maçlık ölçümde bu birleşim modelden daha isabetli çıktı.
+        Değerli mod bu durumda çok az seçim bulur: modelin piyasadan ayrıştığı yerlerde çoğunlukla piyasa haklı çıkıyor.</small>
+    </div>
     <p class="soft"><small>Oran düzeltme: Türkiye'deki oranlar genelde Bet365'ten düşüktür. Örneğin −8 girerseniz bütün oranlar %8 düşürülerek hesaplanır. Değerler 0,40 = %40 biçimindedir. Model–piyasa farkı: modelin ihtimali piyasanınkinden bu kadar fazla yüksekse seçim kupona girmez (büyük fark genelde model hatasıdır).</small></p>
     <button class="btn" type="submit">Ayarları kaydet</button>
   </form>
@@ -77,6 +84,7 @@
       {% if s.safe_skip_low_data %}Verisi az maçlar alınmaz. {% endif %}Kupon, kalanlar arasından tutma ihtimali en yüksek kombinasyonla kurulur.
       Varsayılan olarak <b>en düşük tutma ihtimali sınırı yoktur</b>.</p>
     <p><b>Değerli:</b> Tutma ihtimali en az %{{ (s.value_min_prob * 100)|round|int }} ve değeri (ihtimal × oran − 1) en az %{{ (s.value_min_edge * 100)|round|int }} olan bahisler alınır; aynı model–piyasa sınırı geçerlidir.</p>
+    <p><b>Tutma ihtimali:</b> {% if s.use_market %}Oranı gelen maçlarda modelin tahmini bahisçi oranıyla birleştirilir (maç sonucunda piyasanın ağırlığı yaklaşık %90, 2.5 Alt/Üst'te %75; diğer bahisler buna uyan skor dağılımından). Oran gelmeden önce yalnızca modelin tahmini gösterilir.{% else %}Yalnızca modelin tahmini kullanılır (bahisçi oranıyla birleştirme kapalı).{% endif %}</p>
     {% if pick_range %}<p>Şimdiye kadar sistemin otomatik kuponlarındaki seçimlerin tutma ihtimali:</p>
     <ul>{% for mode, r in pick_range.items() %}
       <li>{{ 'Güvenli' if mode == 'safe' else 'Değerli' }}: en düşük {{ r.min|pct }}, ortalama {{ r.avg|pct }}, en yüksek {{ r.max|pct }} ({{ r.n }} seçim)</li>

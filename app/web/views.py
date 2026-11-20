@@ -132,13 +132,15 @@ def match_detail(session, match_id: int, now: datetime) -> dict | None:
     last_q = (session.query(OddsQuote).filter_by(match_id=m.id)
               .order_by(OddsQuote.fetched_at.desc()).first())
     odds_time = last_q.fetched_at if last_q else None
+    model_probs = (pred.model_probs if pred else None) or {}
     markets = []
     for key in MARKETS:
         if key not in probs:
             continue
         o = odds.get(key)
         markets.append({"key": key, "label": market_label(key, m.home_team.name, m.away_team.name), "prob": probs[key], "odds": o,
-                        "implied": implied.get(key), "value": probs[key] * o - 1 if o else None})
+                        "implied": implied.get(key), "value": probs[key] * o - 1 if o else None,
+                        "model": model_probs.get(key)})
     before = min(now, m.kickoff_utc)
     home, away = m.home_team, m.away_team
     form = {
@@ -166,6 +168,7 @@ def match_detail(session, match_id: int, now: datetime) -> dict | None:
                    "Deplasman golleri": f"{m.away_team.name} golleri (deplasman)"}
     sections = [(team_titles.get(t, t), rows) for t, rows in sections if rows]
     return {"m": m, "pred": pred, "probs": probs, "markets": markets, "picks": pk, "form": form, "h2h": h2h,
+            "blended": bool(model_probs),
             "sections": sections, "h2h_rows": h2h_rows(session, home.id, away.id, before, 6),
             "odds_time": odds_time,
             "missing": missing, "lines": lines, "tm_home": transfermarkt_url(home.name),

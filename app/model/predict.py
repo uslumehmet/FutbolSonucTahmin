@@ -1,4 +1,4 @@
-"""Maç tahmini akışı: Katman 1 (+ eksik düzeltmesi) → pazarlar → Katman 2."""
+"""Maç tahmini akışı: Katman 1 (+ eksik düzeltmesi) → pazarlar → Katman 2 → bahisçi oranıyla birleştirme."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -6,9 +6,10 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from app.config import TZ
+from app.config import TZ, get_settings
 from app.model.injuries import MissingImpact, adjust_lambdas, player_impact
 from app.model.layer2 import GROUPS
+from app.model.market_layer import apply_market
 from app.model.markets import market_probs, probs_from_1x2, score_matrix, top_scores
 from app.model.store import ModelStore
 from app.models import Match, MissingPlayer, PlayerSeasonStat, Prediction, Team
@@ -26,6 +27,7 @@ class MatchPrediction:
     flags: list[str]
     top_scores: list[tuple[int, int, float]] = field(default_factory=list)
     missing: list[dict] = field(default_factory=list)
+    model_probs: dict[str, float] | None = None  # bahisçi oranıyla birleştirmeden önceki model ihtimalleri
 
 
 def missing_impacts(session, match: Match) -> tuple[list[MissingImpact], list[MissingImpact], list[dict], bool]:
@@ -94,13 +96,23 @@ def predict_match(session, store: ModelStore, match: Match, now: datetime) -> Ma
                     elif group == "BTTS":
                         probs["KGVAR"], probs["KGYOK"] = float(out[0]), 1 - float(out[0])
                     layers[group] = 2
-    return MatchPrediction(match.id, lam, mu, probs, layers, flags, top_scores(matrix, 5), snap)
+    model_probs = None
+    if get_settings(session).use_market:
+        from app.betting.selection import latest_odds
+
+        lo = latest_odds(session, match.id)
+        blended = apply_market(probs, lam, mu, rho, lo[1]) if lo else None
+        if blended is not None:
+            model_probs = probs
+            probs, lam, mu, matrix = blended
+            layers["piyasa"] = 1
+    return MatchPrediction(match.id, lam, mu, probs, layers, flags, top_scores(matrix, 5), snap, model_probs)
 
 
 def _store(session, p: MatchPrediction, now: datetime, kind: str = "live") -> Prediction:
     row = Prediction(match_id=p.match_id, kind=kind, created_at=now, lam_home=p.lam_home, lam_away=p.lam_away,
                      probs=p.probs, layers=p.layers, flags=p.flags, missing_snapshot=p.missing,
-                     top_scores=[list(t) for t in p.top_scores])
+                     top_scores=[list(t) for t in p.top_scores], model_probs=p.model_probs)
     session.add(row)
     return row
 
