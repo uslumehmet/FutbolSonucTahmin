@@ -22,8 +22,9 @@ Futbol maçlarının nasıl biteceğini istatistik ve makine öğrenmesiyle tahm
 | Takım gücü | Elo puanları, son maçlar, aralarındaki maçlar |
 | Eksik oyuncular | Sakat ve cezalı oyuncuların hücum ve savunmaya etkisi |
 | Makine öğrenmesi | Lojistik regresyon ve gradient boosting, ardından kalibrasyon. Sadece ölçülerek daha iyi çıkarsa devreye girer |
+| Piyasa ile birleştirme | Oran gelen maçlarda tahmin Bet365 oranıyla birleştirilir; maç sonucunda piyasanın ağırlığı yaklaşık %90, 2.5 Alt/Üst'te %75. 2024–2026'da 1.819 maçlık ölçümde birleşim modelden daha isabetli çıktı. Ayarlar'dan kapatılabilir |
 
-**Geçmiş test (2023–2025, 6.052 maç):** Maç sonucunu doğru tahmin oranı %52,7. Modelin "%70 ve üzeri" dediği seçimler %74,2 oranında tuttu. Geçmişteki başarı gelecekte de aynı olacağı anlamına gelmez.
+**Geçmiş test (2023–2025, 6.052 maç):** Maç sonucunu doğru tahmin oranı %52,7. Modelin "%70 ve üzeri" dediği seçimler %74,2 oranında tuttu. Geçmişteki başarı gelecekte de aynı olacağı anlamına gelmez. Bahisçinin oranları, tek başına modelden daha isabetli (maç sonucunda %54'e %52); geçmiş oranlarla yapılan testte sitenin seçim kuralları uzun vadede kâra geçmedi.
 
 **Teknolojiler:** Python, FastAPI, Jinja2 + HTMX, SQLite (SQLAlchemy), scikit-learn, SciPy, pandas, APScheduler, Chart.js.
 

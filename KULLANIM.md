@@ -34,14 +34,14 @@ Site sadece bilgisayarda çalıştırılırsa saatler biraz farklıdır: 10:30 g
 
 ## Sayfalar
 - **Maçlar:** Her maçın 1-X-2 ihtimal çubuğu, toplam gol 1.5/2.5 Üst, KG Var ve iki takımın ayrı ayrı 1.5 Üst ihtimali, Güvenli/Değerli seçimi. "7 gün" sekmesi haftanın bütün maçlarını gösterir; "oran 1 gün önce gelir" etiketli maçlar sezon fikstüründen gelmiştir, saatleri değişebilir.
-- **Maç detayı:** Bütün bahis seçenekleri (ihtimal, oran, değer), gerekçe, iki takımın son maçları, aralarındaki maçlar, eksik oyuncular. Eksik oyuncuyu elle ekleyebilirsiniz; tahmin hemen güncellenir. "Toplam gol 1.5 Alt" iki takımın gollerinin toplamıdır; "Galler golleri 1.5 Alt" gibi takım adıyla yazanlar sadece o takımın gollerini sayar.
+- **Maç detayı:** Bütün bahis seçenekleri (ihtimal, oran, değer; oran geldiyse ihtimalin altında küçük harfle modelin kendi tahmini), gerekçe, iki takımın son maçları, aralarındaki maçlar, eksik oyuncular. Eksik oyuncuyu elle ekleyebilirsiniz; tahmin hemen güncellenir. "Toplam gol 1.5 Alt" iki takımın gollerinin toplamıdır; "Galler golleri 1.5 Alt" gibi takım adıyla yazanlar sadece o takımın gollerini sayar.
 - **Kupon oluştur:** Hedef oran + mod seçin, sistem en yüksek tutma ihtimalli kuponu kurar; sanal kasanızla oynarsınız.
 - **Kuponlarım:** Her kasanın kuponları, tuttu/tutmadı durumu. Üstte sistemin bugünkü otomatik oyununun ne zaman yapıldığı, kaç kupon oynandığı, oynanmadıysa nedeni ve sıradaki maç günü yazar. Otomatik oyun gecikirse, henüz başlamamış maçlarla (başlamasına en az 1 saat olan) yapılır.
 - **Kasalar:** 100 ₺ ve 1.000 ₺ gibi farklı başlangıçlı kasalar; istediğiniz kadar yenisini açabilirsiniz.
 - **Performans:** Hangi mod kazandırıyor, model söylediği ihtimallerde ne kadar isabetli, geçmiş test raporu.
 
 ## Dürüst not
-Bu sitedeki ihtimaller istatistik ve makine öğrenmesi modellerinin tahminidir, gerçek sonuç değildir; verilen kararların sorumluluğu kullanıcıya aittir (ayrıntı: README'deki "Sorumluluk reddi"). Hiçbir tahmin kesin değildir. Geçmiş testte (2023–2025, 6.052 maç) maç sonucunu bilme oranı %53; model "%70 ve üstü" dediğinde %74 tuttu. Sistemin para kazandırıp kazandırmadığını ancak sanal kasaların birkaç haftalık sonucu gösterir.
+Bu sitedeki ihtimaller istatistik ve makine öğrenmesi modellerinin tahminidir, gerçek sonuç değildir; verilen kararların sorumluluğu kullanıcıya aittir (ayrıntı: README'deki "Sorumluluk reddi"). Hiçbir tahmin kesin değildir. Geçmiş testte (2023–2025, 6.052 maç) maç sonucunu bilme oranı %53; model "%70 ve üstü" dediğinde %74 tuttu. Sistemin para kazandırıp kazandırmadığını ancak sanal kasaların birkaç haftalık sonucu gösterir. Oran gelen maçlarda gösterilen ihtimal, model ile bahisçi oranının birleşimidir; ölçümde ikisinden de isabetli çıktı. Bu yüzden Değerli mod (oranın ihtimale göre yüksek olduğu seçimler) artık seyrek seçim bulur.
 
 ## Komut satırı (isteğe bağlı)
 `.venv\Scripts\python -m app.cli <komut>`: `update`, `autoplay`, `settle`, `probe`, `backtest`, `train-layer2`.
