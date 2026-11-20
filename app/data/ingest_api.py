@@ -150,11 +150,18 @@ def _store_injuries(session, items: list[dict], fixtures: dict[int, Match], rep:
 def player_lookup_budget(api) -> int:
     """Oyuncu istatistiği için harcanabilecek istek: oranlar ve eksikler alındıktan sonra kotada kalan,
     sonuçlandırma payı (API_RESERVE) düşülerek. Yoğun maç günlerinde kendiliğinden azalır, kota bitmez."""
+    left = api_left(api)
+    return max(0, min(MAX_PLAYER_LOOKUPS, left - API_RESERVE))
+
+
+def api_left(api) -> int:
+    """Bugün kalan istek (API'nin bildirdiği kalan hak dahil); bilinemiyorsa 0."""
     try:
-        left = int(api.daily_limit) - int(api.used_today())
+        if hasattr(api, "remaining_today"):
+            return int(api.remaining_today())
+        return int(api.daily_limit) - int(api.used_today())
     except (AttributeError, TypeError, ValueError):
         return 0
-    return max(0, min(MAX_PLAYER_LOOKUPS, left - API_RESERVE))
 
 
 def _fetch_player_stats(session, api, rep: IngestReport, now: datetime | None = None) -> None:
@@ -275,10 +282,7 @@ def refresh_late_odds(session, api, now: datetime) -> list[int]:
     """
     if api is None:
         return []
-    try:
-        budget = int(api.daily_limit) - int(api.used_today()) - LATE_ODDS_RESERVE
-    except (AttributeError, TypeError, ValueError):
-        return []
+    budget = api_left(api) - LATE_ODDS_RESERVE
     matches = (session.query(Match)
                .filter(Match.status == "scheduled", Match.api_fixture_id.isnot(None), Match.unmatched.is_(False),
                        Match.kickoff_utc > now + timedelta(minutes=10),

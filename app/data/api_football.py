@@ -26,6 +26,16 @@ class ApiError(Exception):
     pass
 
 
+def _daily_limit_error(errors) -> bool:
+    """API-Football günlük sınır dolunca 200 + {"errors": {"requests": "...request limit for the day..."}} döner."""
+    if not isinstance(errors, dict):
+        return False
+    if "rateLimit" in errors:
+        return True
+    msg = str(errors.get("requests") or "").lower()
+    return "limit" in msg
+
+
 def _has_errors(errors) -> bool:
     if not errors:
         return False
@@ -68,6 +78,22 @@ class ApiFootball:
         return self.session.query(func.count(ApiCall.id)).filter(
             ApiCall.called_at >= start, ApiCall.status_code != 429).scalar() or 0
 
+    def remaining_today(self) -> int:
+        """Bugün kalan istek: kendi kaydımız ile API'nin son yanıtta bildirdiği kalan hak, hangisi azsa.
+
+        API hakkı hesaba bağlıdır; aynı anahtar başka bir yerde (ör. bilgisayardaki kopya) kullanılırsa
+        kendi kaydımız eksik sayar, API'nin bildirdiği değer bunu yakalar.
+        """
+        left = self.daily_limit - self.used_today()
+        rec = get_value(self.session, "api_remaining") or {}
+        try:
+            at = datetime.fromisoformat(rec["at"])
+            if at.astimezone(UTC).date() == self.clock().astimezone(UTC).date():
+                left = min(left, int(rec["value"]))
+        except (KeyError, TypeError, ValueError):
+            pass
+        return max(0, left)
+
     def month_bytes(self) -> int:
         now = self.clock()
         start = datetime(now.year, now.month, 1, tzinfo=UTC)
@@ -88,7 +114,7 @@ class ApiFootball:
         hit = self.cached(endpoint, params, max_age)
         if hit is not None:
             return hit
-        if self.used_today() >= self.daily_limit:
+        if self.remaining_today() <= 0:
             raise QuotaExceeded(f"günlük API sınırı doldu ({self.daily_limit})")
         for attempt in range(2):
             self._throttle()
@@ -131,7 +157,13 @@ class ApiFootball:
             data = resp.json()
         except ValueError:
             data = {}
-        if resp.status_code == 429 or (isinstance(data.get("errors"), dict) and "rateLimit" in data["errors"]):
+        if resp.status_code == 429 or _daily_limit_error(data.get("errors")):
+            if resp.status_code != 429:  # sınır yanıtı önbelleğe girmesin
+                row = self.session.query(ApiCall).order_by(ApiCall.id.desc()).first()
+                row.status_code = 299
+                self.session.commit()
+            if "day" in body.lower():  # günlük sınır (dakikalık değil): bugün başka istek denenmesin
+                set_value(self.session, "api_remaining", {"value": 0, "at": self.clock().isoformat()})
             raise QuotaExceeded(str(data.get("errors") or "429"))
         if resp.status_code != 200:
             raise ApiError(f"HTTP {resp.status_code}: {body[:200]}")

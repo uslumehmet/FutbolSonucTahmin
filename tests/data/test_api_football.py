@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 import httpx
 import pytest
@@ -91,3 +92,38 @@ def test_odds_for_fixture_asks_bet365_first_then_all(session):
     out = api.odds_for_fixture(1)
     assert len(out) == 1
     assert [dict(c.url.params) for c in calls] == [{"fixture": "1", "bookmaker": "8"}, {"fixture": "1"}]
+
+
+def test_daily_limit_error_stops_further_requests(session):
+    import httpx
+
+    from app.data.api_football import ApiFootball, QuotaExceeded
+
+    calls = []
+
+    def handler(req):
+        calls.append(req.url.path)
+        return httpx.Response(200, json={"errors": {"requests": "You have reached the request limit for the day"},
+                                         "response": []})
+
+    api = ApiFootball(session, "KEY", transport=httpx.MockTransport(handler))
+    with pytest.raises(QuotaExceeded):
+        api.fixtures_on(date(2026, 11, 20))
+    assert api.remaining_today() == 0
+    with pytest.raises(QuotaExceeded):  # ikinci istek gönderilmez
+        api.odds_for_fixture(1)
+    assert len(calls) == 1
+
+
+def test_remaining_uses_server_header(session):
+    import httpx
+
+    from app.data.api_football import ApiFootball
+
+    def handler(req):
+        return httpx.Response(200, json={"errors": [], "response": []},
+                              headers={"x-ratelimit-requests-remaining": "7"})
+
+    api = ApiFootball(session, "KEY", transport=httpx.MockTransport(handler))
+    api.fixtures_on(date(2026, 11, 20))
+    assert api.remaining_today() == 7  # kendi kaydımız 99 der; API 7 diyor (anahtar başka yerde de kullanılmış)
