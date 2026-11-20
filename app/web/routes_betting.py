@@ -18,6 +18,7 @@ from app.web.views import DAY_LABELS, day_window
 router = APIRouter()
 STATUS_LABELS = {"draft": "Taslak", "open": "Açık", "won": "Tuttu", "lost": "Tutmadı", "void": "İptal"}
 TARGETS = [2, 3, 5, 10]
+MIN_PROBS = [60, 65, 70, 75, 80]  # Kupon oluştur: en düşük tutma ihtimali seçenekleri (%)
 
 
 def _render(request, name, ctx):
@@ -64,6 +65,7 @@ def _available_leagues(s, now) -> list[dict]:
 def coupon_form(request: Request):
     with request.app.state.sf() as s:
         return _render(request, "kupon.html", {"nav": "kupon", "targets": TARGETS, "day_labels": DAY_LABELS,
+                                               "min_probs": MIN_PROBS,
                                                "leagues": _available_leagues(s, request.app.state.clock()),
                                                "result": None})
 
@@ -76,7 +78,7 @@ def _drafts_cleanup(s, now):
 
 @router.post("/kupon/olustur", response_class=HTMLResponse)
 def coupon_create(request: Request, hedef: str = Form("3"), mod: str = Form("safe"), gun: str = Form("3gun"),
-                  lig: list[str] | None = Form(None)):
+                  lig: list[str] | None = Form(None), en_az: str = Form("")):
     now = request.app.state.clock()
     with request.app.state.sf() as s:
         _drafts_cleanup(s, now)
@@ -86,6 +88,12 @@ def coupon_create(request: Request, hedef: str = Form("3"), mod: str = Form("saf
         except ValueError:
             target = 0
         mode = mod if mod in ("safe", "value") else "safe"
+        try:
+            min_prob = float(str(en_az).replace(",", ".").replace("%", "")) / 100 if str(en_az).strip() else None
+        except ValueError:
+            min_prob = None
+        if min_prob is not None and not 0 < min_prob < 1:
+            min_prob = None
         reason = None
         coupons = []
         if target < 1.1 or target > 1000:
@@ -100,16 +108,23 @@ def coupon_create(request: Request, hedef: str = Form("3"), mod: str = Form("saf
                 cands = {k: v for k, v in cands.items() if k in allowed}
             available = sorted({m.competition.name for m in s.query(Match).filter(Match.id.in_(list(all_cands)))})
             pool = {k: eligible(v, mode, settings) for k, v in cands.items()}
+            if min_prob is not None:
+                pool = {k: [c for c in v if c.prob >= min_prob - 1e-9] for k, v in pool.items()}
             pool = {k: v for k, v in pool.items() if v}
             drafts = build_coupons(pool, target, settings.coupon_max_picks, settings.coupon_upper_factor)
             play_date = now.astimezone(TZ).date()
-            coupons = [save_coupon(s, d, mode, target, "user", play_date, status="draft") for d in drafts]
+            coupons = [save_coupon(s, d, mode, target, "user", play_date, status="draft", min_prob=min_prob)
+                       for d in drafts]
             if not cands and all_cands:
                 reason = ("Seçtiğin liglerde bu aralıkta oranlı maç yok. Oranlı maçı olan ligler: "
                           + ", ".join(available) + ". Lig seçimini kaldırıp tekrar deneyin.")
             elif not cands:
                 reason = ("Bu aralıkta oranı ve tahmini olan maç yok. Ücretsiz API planı yalnızca bugünün ve "
                           "yarının maçlarını verir; oranlar her sabah güncellenir.")
+            elif not coupons and min_prob is not None:
+                reason = (f"Tutma ihtimali en az %{round(min_prob * 100)} olan seçimlerle hedef orana ulaşılamadı "
+                          f"({len(pool)} maçta uygun seçim var). Sınırı ya da hedef oranı düşürün, "
+                          "ya da daha uzun bir aralık seçin.")
             elif not coupons:
                 reason = ("Bu aralıkta değerli seçim yetersiz; hedef oranı düşürün ya da daha uzun bir aralık seçin."
                           if mode == "value" else
@@ -119,7 +134,39 @@ def coupon_create(request: Request, hedef: str = Form("3"), mod: str = Form("saf
         if request.headers.get("HX-Request"):
             return request.app.state.templates.TemplateResponse(request, "partials/_coupons.html", ctx)
         return _render(request, "kupon.html", {"nav": "kupon", "targets": TARGETS, "day_labels": DAY_LABELS,
-                                               "leagues": _available_leagues(s, now), "result": ctx})
+                                               "min_probs": MIN_PROBS, "leagues": _available_leagues(s, now),
+                                               "result": ctx})
+
+
+@router.post("/kupon/{coupon_id}/cikar/{pick_id}", response_class=HTMLResponse)
+def coupon_remove_pick(request: Request, coupon_id: int, pick_id: int, idx: int = Form(0)):
+    """Henüz oynanmamış (taslak) kupondan bir maçı çıkarır; toplam oran ve ihtimal yeniden hesaplanır."""
+    import math
+
+    from app.models import CouponPick
+
+    with request.app.state.sf() as s:
+        coupon = s.get(Coupon, coupon_id)
+        pick = s.get(CouponPick, pick_id)
+        if coupon is None or pick is None or pick.coupon_id != coupon.id:
+            raise HTTPException(404)
+        if coupon.status != "draft":
+            return _go("/kupon", hata="Oynanmış kupondan maç çıkarılamaz.")
+        if len(coupon.picks) > 1:
+            coupon.picks.remove(pick)
+            s.delete(pick)
+            coupon.total_odds = round(math.prod(p.odds for p in coupon.picks), 4)
+            coupon.prob = math.prod(p.prob for p in coupon.picks)
+            s.commit()
+        wallets = s.query(Wallet).filter_by(owner="user", busted=False).order_by(Wallet.id).all()
+        ctx = {"c": coupon, "idx": idx, "wallets": wallets}
+        if request.headers.get("HX-Request"):
+            return request.app.state.templates.TemplateResponse(request, "partials/_slip.html", ctx)
+        result = {"coupons": [coupon], "reason": None, "wallets": wallets, "mode": coupon.mode}
+        return _render(request, "kupon.html", {"nav": "kupon", "targets": TARGETS, "day_labels": DAY_LABELS,
+                                               "min_probs": MIN_PROBS,
+                                               "leagues": _available_leagues(s, request.app.state.clock()),
+                                               "result": result})
 
 
 @router.post("/kupon/{coupon_id}/oyna")

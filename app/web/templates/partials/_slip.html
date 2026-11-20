@@ -1,0 +1,28 @@
+{# Kupon oluştur'daki tek kupon. Değişkenler: c (Coupon), idx (0 = en iyi kupon), wallets. #}
+<article class="slip {{ c.mode }}" id="kupon-{{ c.id }}">
+  <h3>{% if idx == 0 %}En iyi kupon{% else %}Alternatif {{ idx }}{% endif %} <small class="soft">{{ 'Güvenli' if c.mode == 'safe' else 'Değerli' }}, hedef {{ '%g'|format(c.target_odds) }}{% if c.min_prob %}, en az {{ c.min_prob|pct }}{% endif %}</small></h3>
+  {% for p in c.picks %}
+  <div class="line">
+    <span>{{ p.match.home_team.name }} – {{ p.match.away_team.name }}<br><small class="soft">{{ p.match.kickoff_utc|local_dt }}</small></span>
+    <span>{{ market_html(p.market, p.match.home_team.name, p.match.away_team.name) }}<br><small class="soft">{{ p.prob|pct }}</small></span>
+    <span class="num">{{ p.odds|odds }}</span>
+    {% if c.status == 'draft' and c.picks|length > 1 %}
+    <form class="line-remove" method="post" action="/kupon/{{ c.id }}/cikar/{{ p.id }}"
+          hx-post="/kupon/{{ c.id }}/cikar/{{ p.id }}" hx-target="#kupon-{{ c.id }}" hx-swap="outerHTML">
+      <input type="hidden" name="idx" value="{{ idx }}">
+      <button class="icon-btn" type="submit" aria-label="{{ p.match.home_team.name }} – {{ p.match.away_team.name }} maçını kupondan çıkar" data-tip="Bu maçı kupondan çıkar">×</button>
+    </form>
+    {% else %}<span></span>{% endif %}
+  </div>
+  {% endfor %}
+  <div class="sum"><span>Toplam oran</span><span>{{ c.total_odds|odds }}</span></div>
+  {% if c.total_odds < c.target_odds - 0.005 %}<p class="soft"><small>Toplam oran hedefin ({{ '%g'|format(c.target_odds) }}) altında; maç çıkardınız.</small></p>{% endif %}
+  <p>Kuponun tutma ihtimali <b>{{ c.prob|pct }}</b><br><small class="soft">Beklenen getiri {{ (c.prob * c.total_odds - 1)|signed_pct }}</small></p>
+  {% if wallets %}
+  <form class="inline-form" method="post" action="/kupon/{{ c.id }}/oyna">
+    <label>Kasa <select name="wallet_id">{% for w in wallets %}<option value="{{ w.id }}">{{ w.name }} ({{ w.balance|tl }})</option>{% endfor %}</select></label>
+    <label>Tutar (₺) <input type="number" name="tutar" min="1" step="1" value="10" style="width:6rem"></label>
+    <button class="btn" type="submit">Oyna</button>
+  </form>
+  {% else %}<p class="soft">Oynamak için <a href="/kasalar">bir kasa açın</a>.</p>{% endif %}
+</article>

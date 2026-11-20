@@ -51,8 +51,8 @@
       {% else %}<small>Tahmin yok</small>{% endif %}
     </div>
     <div class="extra">
-      {% if r.picks.safe %}<span class="pick safe" data-tip="Güvenli seçim: tutma ihtimali en yüksek bahis. {{ MARKET_HELP[r.picks.safe.market] }}">Güvenli <b>{{ market_label(r.picks.safe.market, r.m.home_team.name, r.m.away_team.name) }}</b> {{ r.picks.safe.odds|odds }} · {{ r.picks.safe.prob|pct }}</span>{% endif %}
-      {% if r.picks.value %}<span class="pick value" data-tip="Değerli seçim: oranı, modelin ihtimaline göre yüksek olan bahis. {{ MARKET_HELP[r.picks.value.market] }}">Değerli <b>{{ market_label(r.picks.value.market, r.m.home_team.name, r.m.away_team.name) }}</b> {{ r.picks.value.odds|odds }} · {{ r.picks.value.prob|pct }}</span>
+      {% if r.picks.safe %}<span class="pick safe" data-tip="Güvenli seçim: tutma ihtimali en yüksek bahis. {{ MARKET_HELP[r.picks.safe.market] }}">Güvenli <b>{{ market_label(r.picks.safe.market, r.m.home_team.name, r.m.away_team.name) }}</b> <span class="po">{{ r.picks.safe.odds|odds }} · {{ r.picks.safe.prob|pct }}</span></span>{% endif %}
+      {% if r.picks.value %}<span class="pick value" data-tip="Değerli seçim: oranı, modelin ihtimaline göre yüksek olan bahis. {{ MARKET_HELP[r.picks.value.market] }}">Değerli <b>{{ market_label(r.picks.value.market, r.m.home_team.name, r.m.away_team.name) }}</b> <span class="po">{{ r.picks.value.odds|odds }} · {{ r.picks.value.prob|pct }}</span></span>
       {% elif r.picks.cands %}<span class="flag">değerli seçim yok</span>{% endif %}
       {% if r.picks.book == 'AVG' %}<span class="flag">oranlar ort.</span>{% endif %}
       {% if r.missing %}<span class="flag">{{ r.missing }} eksik</span>{% endif %}

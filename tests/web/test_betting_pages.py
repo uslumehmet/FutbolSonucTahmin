@@ -240,3 +240,43 @@ def test_coupon_form_shows_leagues_waiting_for_odds(client_seeded, session_facto
     html = client_seeded.get("/kupon").text  # oran yok: ligler seçilemez ama görünür
     assert "Oranı henüz gelmeyenler" in html and "Premier League" in html
     assert 'name="lig" value="E0"' not in html
+
+
+def test_remove_pick_from_draft_coupon(client_seeded, session_factory):
+    import math
+
+    from app.models import CouponPick
+
+    _make_value_odds(session_factory)
+    r = client_seeded.post("/kupon/olustur", data={"hedef": "5", "mod": "safe", "gun": "3gun"})
+    pairs = re.findall(r'action="/kupon/(\d+)/cikar/(\d+)"', r.text)
+    assert pairs, "en az iki maçlı bir kupon olmalı"
+    cid, pid = (int(x) for x in pairs[0])
+    with session_factory() as s:
+        before = len(s.get(Coupon, cid).picks)
+    r = client_seeded.post(f"/kupon/{cid}/cikar/{pid}", data={"idx": "0"}, headers={"HX-Request": "true"})
+    assert r.status_code == 200 and f'id="kupon-{cid}"' in r.text and "En iyi kupon" in r.text
+    with session_factory() as s:
+        c = s.get(Coupon, cid)
+        assert len(c.picks) == before - 1 and s.get(CouponPick, pid) is None
+        assert c.total_odds == round(math.prod(p.odds for p in c.picks), 4)
+        assert c.prob == math.prod(p.prob for p in c.picks)
+        w = s.query(Wallet).filter_by(owner="user").one()
+    client_seeded.post(f"/kupon/{cid}/oyna", data={"wallet_id": w.id, "tutar": "10"})
+    with session_factory() as s:
+        other = s.get(Coupon, cid).picks[0].id
+    r = client_seeded.post(f"/kupon/{cid}/cikar/{other}", data={"idx": "0"}, follow_redirects=True)
+    assert "Oynanmış kupondan maç çıkarılamaz" in r.text
+
+
+def test_coupon_min_probability_filter(client_seeded, session_factory):
+    _make_value_odds(session_factory)
+    assert 'name="en_az"' in client_seeded.get("/kupon").text
+    r = client_seeded.post("/kupon/olustur", data={"hedef": "2", "mod": "safe", "gun": "3gun", "en_az": "60"})
+    ids = [int(x) for x in re.findall(r'action="/kupon/(\d+)/oyna"', r.text)]
+    with session_factory() as s:
+        for cid in ids:
+            c = s.get(Coupon, cid)
+            assert c.min_prob == 0.6 and all(p.prob >= 0.6 for p in c.picks)
+    r = client_seeded.post("/kupon/olustur", data={"hedef": "3", "mod": "safe", "gun": "3gun", "en_az": "99"})
+    assert "en az %99" in r.text and not re.search(r'action="/kupon/\d+/oyna"', r.text)

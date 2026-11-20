@@ -19,6 +19,13 @@
       </div>
     </div>
     <div>
+      <div><b>En düşük tutma ihtimali</b></div>
+      <div class="seg" role="radiogroup" aria-label="En düşük tutma ihtimali">
+        <label><input type="radio" name="en_az" value="" checked><span>Yok</span></label>
+        {% for v in min_probs %}<label><input type="radio" name="en_az" value="{{ v }}"><span>%{{ v }}</span></label>{% endfor %}
+      </div>
+    </div>
+    <div>
       <div><b>Zaman</b></div>
       <div class="seg" role="radiogroup" aria-label="Zaman">
         {% for key, label in day_labels.items() %}<label><input type="radio" name="gun" value="{{ key }}" {% if key == '3gun' %}checked{% endif %}><span>{{ label }}</span></label>{% endfor %}
@@ -34,7 +41,8 @@
       </div>{% endif %}
     </fieldset>
   </div>
-  <p class="soft"><small><b>Güvenli</b>: tutma ihtimali en yüksek seçimler. <b>Değerli</b>: ihtimali yüksek ve oranı hak ettiğinden fazla olan seçimler. Hiçbir lig işaretlemezseniz hepsi dahil.</small></p>
+  <p class="soft"><small><b>Güvenli</b>: tutma ihtimali en yüksek seçimler. <b>Değerli</b>: ihtimali yüksek ve oranı hak ettiğinden fazla olan seçimler. Hiçbir lig işaretlemezseniz hepsi dahil.
+    <b>En düşük tutma ihtimali</b>: kupona sadece tutma ihtimali en az bu kadar olan seçimler girer (ör. %75); sınır yükseldikçe oranlar düşer, hedefe ulaşmak için daha çok maç gerekir. Kurulan kupondan istemediğiniz maçı × ile çıkarabilirsiniz.</small></p>
   <button class="btn" type="submit">Kupon oluştur</button>
 </form>
 <div id="sonuc">{% if result %}{% with coupons=result.coupons, reason=result.reason, wallets=result.wallets, mode=result.mode %}{% include "partials/_coupons.html" %}{% endwith %}{% endif %}</div>
