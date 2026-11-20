@@ -36,6 +36,31 @@
   {% if m.unmatched %}<div class="notice error" style="margin-top:.75rem">Takımlardan biri geçmiş verideki bir takımla eşleşmedi, bu yüzden tahmin yapılmadı. <a href="/ayarlar#eslestirme">Ayarlar'dan eşleştirin</a>.</div>{% endif %}
 </section>
 
+{% set st = m.stats or {} %}
+{% if m.status == 'finished' and (st.sot or st.xi_home) %}
+<section class="panel match-stats">
+  <h2>Maç istatistikleri</h2>
+  {% if st.sot %}
+  <div class="table-wrap"><table>
+    <tr><th class="num">{{ m.home_team.name }}</th><th style="text-align:center"></th><th>{{ m.away_team.name }}</th></tr>
+    {% for key, label, fmt in [('shots', 'Şut', '%d'), ('sot', 'İsabetli şut', '%d'), ('poss', 'Topla oynama', '%%%.0f'), ('corners', 'Korner', '%d'), ('fouls', 'Faul', '%d'), ('yellow', 'Sarı kart', '%d'), ('red', 'Kırmızı kart', '%d')] %}
+      {% if st[key] %}<tr><td class="num"><b>{{ fmt|format(st[key][0]) }}</b></td><td style="text-align:center" class="soft">{{ label }}</td><td><b>{{ fmt|format(st[key][1]) }}</b></td></tr>{% endif %}
+    {% endfor %}
+  </table></div>
+  {% endif %}
+  {% if st.xi_home and st.xi_away %}
+  <details class="sub"><summary>İlk 11</summary>
+    <div class="grid2">
+      {% for side, team in [('xi_home', m.home_team.name), ('xi_away', m.away_team.name)] %}
+      <div><h3>{{ team }}</h3><ol class="xi">{% for p in st[side] %}<li>{{ p[1] }} <small class="soft">{{ p[2] or '' }}</small></li>{% endfor %}</ol></div>
+      {% endfor %}
+    </div>
+  </details>
+  {% endif %}
+  <p class="soft"><small>Kaynak: ESPN.</small></p>
+</section>
+{% endif %}
+
 <div class="grid2">
   <section class="panel">
     <h2>Bahis seçenekleri</h2>

@@ -58,7 +58,7 @@ def _calendar_days(league: dict) -> list[date]:
 
 
 def parse_scoreboard(text: str) -> tuple[int | None, list[date], list[dict]]:
-    """(sezon başlangıç yılı, maç günleri, maçlar). Maç: season, kickoff_utc, home, away, completed, fthg, ftag.
+    """(sezon başlangıç yılı, maç günleri, maçlar). Maç: espn_id, season, kickoff_utc, home, away, completed, fthg, ftag.
 
     Bir sezonun takvimi bazen sonraki sezonun ilk günlerini de içerir (2021-22 takviminde Ağustos 2022);
     bu yüzden her maçın kendi sezon bilgisi de okunur."""
@@ -73,7 +73,7 @@ def parse_scoreboard(text: str) -> tuple[int | None, list[date], list[dict]]:
             continue
         status = (e.get("status") or {}).get("type") or {}
         completed = bool(status.get("completed")) and status.get("state") == "post"
-        row = {"season": (e.get("season") or {}).get("year"),
+        row = {"espn_id": str(e["id"]) if e.get("id") else None, "season": (e.get("season") or {}).get("year"),
                "kickoff_utc": datetime.fromisoformat(e["date"].replace("Z", "+00:00")),
                "home": sides["home"]["team"]["displayName"], "away": sides["away"]["team"]["displayName"],
                "completed": completed, "fthg": None, "ftag": None}
@@ -139,7 +139,9 @@ def _upsert(session, comp: Competition, season: int, rows: list[dict], ids: dict
                       kickoff_utc=r["kickoff_utc"], stats={})
             session.add(m)
             existing[key] = m
-        elif m.status == "finished" and m.api_fixture_id is not None:
+        if r.get("espn_id") and (m.stats or {}).get("espn_id") != r["espn_id"]:
+            m.stats = {**(m.stats or {}), "espn_id": r["espn_id"]}  # maç ayrıntısı (şut, ilk 11) için
+        if m.status == "finished" and m.api_fixture_id is not None:
             continue  # API sonucu esas alınır
         m.kickoff_utc = r["kickoff_utc"]
         m.status = "finished"
@@ -219,4 +221,123 @@ def ingest_espn(session, today: date, codes: list[str] | None = None, seasons: l
             if not unresolved:  # eşleşmeyen ad varsa o günler bir dahaki sefere yeniden işlensin
                 done |= set(finished_days)
     set_value(session, DONE_KEY, sorted(done))
+    return rep
+
+
+# ---------------------------------------------------------------- maç ayrıntısı: istatistik ve ilk 11
+
+STAT_KEYS = {"totalShots": "shots", "shotsOnTarget": "sot", "possessionPct": "poss", "wonCorners": "corners",
+             "foulsCommitted": "fouls", "yellowCards": "yellow", "redCards": "red"}
+
+
+def summary_url(slug: str, espn_id: str) -> str:
+    return f"{BASE}/{slug}/summary?event={espn_id}"
+
+
+def _num(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_summary(text: str) -> dict:
+    """Maç ayrıntısından ev/deplasman istatistikleri ve ilk 11.
+
+    Dönen sözlük Match.stats'e eklenir: {"shots": [ev, dep], "sot": [...], "poss": [...], "corners": [...],
+    "fouls": [...], "yellow": [...], "red": [...], "xi_home": [[id, ad, mevki], ...], "xi_away": [...]}.
+    Eksik olan alan yazılmaz. Hiç istatistik yoksa {"summary": "yok"} döner (bir daha istenmesin diye).
+    """
+    data = json.loads(text)
+    out: dict = {}
+    side_of = {}
+    for c in ((data.get("header") or {}).get("competitions") or [{}])[0].get("competitors") or []:
+        side_of[str((c.get("team") or {}).get("id"))] = c.get("homeAway")
+    vals: dict[str, dict] = {}
+    for t in (data.get("boxscore") or {}).get("teams") or []:
+        side = side_of.get(str((t.get("team") or {}).get("id")))
+        if side not in ("home", "away"):
+            continue
+        for st in t.get("statistics") or []:
+            key = STAT_KEYS.get(st.get("name"))
+            if key:
+                vals.setdefault(key, {})[side] = _num(st.get("displayValue"))
+    for key, v in vals.items():
+        if v.get("home") is not None and v.get("away") is not None:
+            out[key] = [v["home"], v["away"]]
+    for r in data.get("rosters") or []:
+        side = r.get("homeAway") or side_of.get(str((r.get("team") or {}).get("id")))
+        xi = [[str(p["athlete"].get("id")), p["athlete"].get("displayName"), (p.get("position") or {}).get("abbreviation")]
+              for p in r.get("roster") or [] if p.get("starter") and p.get("athlete")]
+        if side in ("home", "away") and len(xi) >= 10:
+            out[f"xi_{side}"] = xi
+    return out or {"summary": "yok"}
+
+
+@dataclass
+class SummaryReport:
+    requests: int = 0
+    matches: int = 0
+    with_stats: int = 0
+    with_lineups: int = 0
+    errors: list[str] = field(default_factory=list)
+    stopped: bool = False
+
+
+def ingest_summaries(session, codes: list[str] | None = None, seasons: list[int] | None = None,
+                     fetch=fetch_text, max_requests: int = 100, workers: int = 4) -> SummaryReport:
+    """ESPN numarası bilinen, bitmiş ve ayrıntısı henüz alınmamış maçların istatistik ve ilk 11'ini yazar.
+
+    Bitmiş maçın ayrıntısı değişmez; dosya bir kez indirilir (`data/raw/espn/ozet/`). İndirmeler `workers`
+    kadar paralel yapılır (ESPN'i yormamak için az tutulur); veritabanına yazma tek iş parçacığında.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    rep = SummaryReport()
+    leagues = {lg.code: lg for lg in CLUB_LEAGUES if lg.code in SLUGS and (codes is None or lg.code in codes)}
+    comps = {c.id: c.code for c in session.query(Competition).filter(Competition.code.in_(list(leagues)))}
+    q = session.query(Match).filter(Match.competition_id.in_(list(comps)), Match.status == "finished")
+    if seasons:
+        q = q.filter(Match.season.in_(seasons))
+    todo = []
+    for m in q.order_by(Match.kickoff_utc):
+        st = m.stats or {}
+        if st.get("espn_id") and "summary" not in st:
+            todo.append(m)
+    jobs = []
+    for m in todo:
+        code = comps[m.competition_id]
+        dest = ESPN_DIR / "ozet" / code / f"{m.stats['espn_id']}.json"
+        if not is_fresh(dest, None):
+            if rep.requests >= max_requests:
+                rep.stopped = True
+                break
+            rep.requests += 1
+        jobs.append((m, summary_url(SLUGS[code], m.stats["espn_id"]), dest))
+
+    def get(job):
+        m, url, dest = job
+        try:
+            return m, fetch(url, dest, None), None
+        except (httpx.HTTPError, OSError) as exc:
+            return m, None, exc
+
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        for i, (m, text, exc) in enumerate(pool.map(get, jobs), 1):
+            if exc is not None:
+                rep.errors.append(f"{m.id}: {exc}")
+                continue
+            try:
+                parsed = parse_summary(text)
+            except (ValueError, KeyError, TypeError) as e:
+                rep.errors.append(f"{m.id}: çözülemedi ({e})")
+                continue
+            parsed.setdefault("summary", "ok")
+            m.stats = {**(m.stats or {}), **parsed}
+            rep.matches += 1
+            rep.with_stats += "sot" in parsed
+            rep.with_lineups += "xi_home" in parsed and "xi_away" in parsed
+            if i % 200 == 0:
+                session.commit()
+    session.commit()
     return rep

@@ -28,7 +28,7 @@ def test_parse_scoreboard():
                   [_event("Kasimpasa", "Samsunspor", 4, 1), _event("Goztepe", "Kocaelispor", 0, 0, done=False)])
     season, cal, events = parse_scoreboard(text)
     assert season == 2026 and cal == [date(2026, 10, 18), date(2026, 10, 19)]
-    assert events[0] == {"season": 2026, "kickoff_utc": datetime(2026, 10, 18, 16, 0, tzinfo=UTC), "home": "Kasimpasa",
+    assert events[0] == {"espn_id": "1", "season": 2026, "kickoff_utc": datetime(2026, 10, 18, 16, 0, tzinfo=UTC), "home": "Kasimpasa",
                          "away": "Samsunspor", "completed": True, "fthg": 4, "ftag": 1}
     assert events[1]["completed"] is False and events[1]["fthg"] is None
 
@@ -129,3 +129,46 @@ def test_request_limit_stops_and_resumes(session, tmp_espn):
     assert rep.stopped and rep.requests == 2
     rep = ingest_espn(session, TODAY, codes=["T1"], fetch=_fake(pages, []), max_requests=2)
     assert not rep.stopped and "T1:20261019" in get_value(session, "espn_done")
+
+
+def _summary(home_id="1", away_id="2", stats=True, xi=11):
+    def team(tid, shots, sot):
+        return {"team": {"id": tid}, "statistics": [{"name": "totalShots", "displayValue": str(shots)},
+                                                     {"name": "shotsOnTarget", "displayValue": str(sot)},
+                                                     {"name": "possessionPct", "displayValue": "55.5"}] if stats else []}
+    def roster(side, tid):
+        return {"homeAway": side, "team": {"id": tid}, "roster": [
+            {"starter": i < xi, "athlete": {"id": f"{tid}{i}", "displayName": f"P{i}"}, "position": {"abbreviation": "M"}}
+            for i in range(16)]}
+    return json.dumps({"header": {"competitions": [{"competitors": [
+        {"homeAway": "home", "team": {"id": home_id}}, {"homeAway": "away", "team": {"id": away_id}}]}]},
+        "boxscore": {"teams": [team(away_id, 9, 4), team(home_id, 24, 6)]},
+        "rosters": [roster("home", home_id), roster("away", away_id)]})
+
+
+def test_parse_summary_stats_and_lineups():
+    from app.data.espn import parse_summary
+    out = parse_summary(_summary())
+    assert out["shots"] == [24, 9] and out["sot"] == [6, 4]  # takım sırası karışık gelse de ev/deplasman doğru
+    assert len(out["xi_home"]) == 11 and out["xi_home"][0] == ["10", "P0", "M"]
+    assert parse_summary(_summary(stats=False, xi=0)) == {"summary": "yok"}
+
+
+def test_ingest_summaries_fills_stats_once(session, tmp_espn):
+    from app.data.espn import ingest_summaries
+    comp, t, plan, api = _setup(session)
+    api.stats = {"espn_id": "777"}
+    session.commit()
+    calls = []
+
+    def fetch(url, dest, max_age):
+        calls.append(url)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(_summary(), encoding="utf-8")
+        return _summary()
+
+    rep = ingest_summaries(session, fetch=fetch, workers=2)
+    session.refresh(api)
+    assert rep.matches == 1 and rep.with_stats == 1 and rep.with_lineups == 1
+    assert api.stats["sot"] == [6, 4] and api.stats["summary"] == "ok" and api.stats["espn_id"] == "777"
+    assert ingest_summaries(session, fetch=fetch).matches == 0 and len(calls) == 1  # bir daha istenmez

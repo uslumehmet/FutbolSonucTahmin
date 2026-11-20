@@ -73,9 +73,14 @@ def daily_update(sf, now: datetime) -> None:
             rep.results += bf.results
         try:  # ikinci kaynak: API'nin göremediği günlerin sonuçları (ESPN); hata verirse güncelleme sürer
             from app.data.espn import ingest_espn
-            es = ingest_espn(s, now.astimezone(TZ).date(), recent_days=ESPN_RECENT_DAYS, max_requests=40)
+            from app.data.espn import ingest_summaries
+            today = now.astimezone(TZ).date()
+            es = ingest_espn(s, today, recent_days=ESPN_RECENT_DAYS, max_requests=40)
             rep.results += es.results
             rep.errors += [f"ESPN: {e}" for e in es.errors] + [f"ESPN eşleşmeyen: {u}" for u in es.unresolved]
+            # biten maçların şut, topla oynama ve ilk 11 bilgisi (maç sayfası, Kuponlarım ve model için)
+            sm = ingest_summaries(s, seasons=[current_season_start(today)], max_requests=120)
+            rep.errors += [f"ESPN ayrıntı: {e}" for e in sm.errors[:5]]
         except Exception as exc:  # noqa: BLE001 - ikinci kaynak asıl işi durdurmamalı
             log.exception("ESPN hatası")
             rep.errors.append(f"ESPN: {exc}")

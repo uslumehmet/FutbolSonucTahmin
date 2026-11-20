@@ -119,3 +119,69 @@ def head_to_head(session, a_id: int, b_id: int, before: datetime, n: int = 6) ->
           .order_by(Match.kickoff_utc.desc()).limit(n).all())
     names, comps = _names(session, ms)
     return [_to_recent(m, a_id, names, comps) for m in ms]
+
+
+# ---------------------------------------------------------------- şut ve kadro özellikleri (ESPN maç ayrıntısı)
+
+SHOT_COLUMNS = ["h_sot5", "h_sota5", "a_sot5", "a_sota5", "h_sh5", "h_sha5", "a_sh5", "a_sha5",
+                "h_sot10", "h_sota10", "a_sot10", "a_sota10"]
+LINEUP_COLUMNS = ["h_xi_core", "a_xi_core", "h_xi_changes", "a_xi_changes"]
+CORE_LOOKBACK = 10  # kadro gücü: son kaç maçın ilk 11'ine bakılır
+MIN_LINEUPS = 5
+
+
+def _stat_pair(stats, key):
+    v = (stats or {}).get(key) if isinstance(stats, dict) else None
+    if not v or len(v) != 2 or v[0] is None or v[1] is None:
+        return None
+    return float(v[0]), float(v[1])
+
+
+def extra_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Şut ve kadro özellikleri (sızıntısız: her maç sadece kendinden önceki maçlarla).
+
+    df: competition_frame çıktısı ("stats" sütunu ile). Şut verisi olmayan maçlar ortalamaya girmez.
+    Kadro: takımın son CORE_LOOKBACK maçında en çok ilk 11'e çıkan 11 oyuncu "düzenli kadro"dur;
+    h_xi_core = bu maçın ilk 11'inde düzenli kadrodan kaç oyuncu var / 11. Maç başlamadan bilinemez
+    (ilk 11 ~1 saat önce açıklanır); sadece maç öncesi yenileme yapılırsa kullanılabilir.
+    """
+    data = df.sort_values("kickoff_utc", kind="stable")
+    shots: dict[int, deque] = {}
+    xis: dict[int, deque] = {}
+    out = {}
+    for row in data.itertuples(index=False):
+        h, a = int(row.home_id), int(row.away_id)
+        hs = shots.setdefault(h, deque(maxlen=10))
+        as_ = shots.setdefault(a, deque(maxlen=10))
+        rec = {}
+        for p, q in (("h", hs), ("a", as_)):
+            rec[f"{p}_sot5"] = _mean((x[0] for x in q), 5) if q else np.nan
+            rec[f"{p}_sota5"] = _mean((x[1] for x in q), 5) if q else np.nan
+            rec[f"{p}_sh5"] = _mean((x[2] for x in q), 5) if q else np.nan
+            rec[f"{p}_sha5"] = _mean((x[3] for x in q), 5) if q else np.nan
+            rec[f"{p}_sot10"] = _mean(x[0] for x in q) if q else np.nan
+            rec[f"{p}_sota10"] = _mean(x[1] for x in q) if q else np.nan
+        stats = row.stats if isinstance(row.stats, dict) else {}
+        for p, team, side in (("h", h, "home"), ("a", a, "away")):
+            hist = xis.setdefault(team, deque(maxlen=CORE_LOOKBACK))
+            xi = {pl[0] for pl in stats.get(f"xi_{side}") or []}
+            if xi and len(hist) >= MIN_LINEUPS:
+                counts: dict[str, int] = {}
+                for past in hist:
+                    for pid in past:
+                        counts[pid] = counts.get(pid, 0) + 1
+                core = set(sorted(counts, key=lambda k: -counts[k])[:11])
+                rec[f"{p}_xi_core"] = len(xi & core) / 11
+                rec[f"{p}_xi_changes"] = float(len(xi - hist[-1]))
+            else:
+                rec[f"{p}_xi_core"] = np.nan
+                rec[f"{p}_xi_changes"] = np.nan
+            if xi:
+                hist.append(xi)
+        out[row.id] = rec
+        if pd.notna(row.home_goals):
+            sot, sh = _stat_pair(stats, "sot"), _stat_pair(stats, "shots")
+            if sot and sh:
+                hs.append((sot[0], sot[1], sh[0], sh[1]))
+                as_.append((sot[1], sot[0], sh[1], sh[0]))
+    return pd.DataFrame.from_dict(out, orient="index")[SHOT_COLUMNS + LINEUP_COLUMNS]

@@ -92,3 +92,9 @@ def test_reviews_for_uses_prediction_made_before_coupon(session_factory):
         s.commit()
         out = reviews_for(s, [p])
         assert "toplam 2.8 gol bekliyordu" in out[p.id].why  # kupondan sonraki tahmin (3.0) değil
+
+
+def test_finished_review_shows_match_stats():
+    r = review_pick("ALT35", 0.69, 1.57, "lost", "finished", 2, 3, "Wales", "Portugal", PRED,
+                    {"shots": [9.0, 24.0], "sot": [4.0, 6.0], "poss": [37.7, 62.3]})
+    assert r.lines[0] == "Maç istatistiği: şut Wales 9 – 24 Portugal, isabetli şut 4 – 6, topla oynama %38 – %62"

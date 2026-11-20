@@ -456,3 +456,8 @@ details.panel > summary h2 { margin: 0; }
 .login-form input[type=password] { width: 100%; box-sizing: border-box; padding: .6rem .7rem; }
 .login-form .btn { justify-self: start; }
 .footer-links { display: inline-flex; gap: 1.1rem; align-items: center; }
+
+/* maç sayfası: istatistik ve ilk 11 */
+.match-stats table { max-width: 32rem; }
+.xi { margin: .25rem 0; padding-left: 1.4rem; }
+.xi li { margin: .1rem 0; }

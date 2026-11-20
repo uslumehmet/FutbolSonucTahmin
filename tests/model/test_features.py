@@ -63,3 +63,24 @@ def test_head_to_head_excludes_future(session):
     assert [(r.gf, r.ga, r.result) for r in h2h] == [(0, 0, "B"), (2, 1, "G")]
     rec = recent_matches(session, a.id, before=T0 + timedelta(days=100), n=10, venue="E")
     assert [r.venue for r in rec] == ["E", "E"]
+
+
+def test_extra_features_are_leak_free_and_track_core_lineup():
+    import numpy as np
+    import pandas as pd
+
+    from app.model.features import extra_features
+    rows = []
+    xi_a = [[str(i), f"P{i}", "M"] for i in range(11)]
+    for k in range(7):
+        xi = xi_a if k < 6 else [[str(i), f"P{i}", "M"] for i in range(3, 14)]  # son maçta 3 değişiklik
+        rows.append({"id": k, "kickoff_utc": pd.Timestamp("2026-01-01", tz="UTC") + pd.Timedelta(days=7 * k),
+                     "home_id": 1, "away_id": 2, "home_goals": 1, "away_goals": 0,
+                     "stats": {"sot": [4 + k, 2], "shots": [10, 5], "xi_home": xi, "xi_away": []}})
+    f = extra_features(pd.DataFrame(rows))
+    assert np.isnan(f.loc[0, "h_sot5"])  # ilk maçta geçmiş yok
+    assert f.loc[1, "h_sot5"] == 4 and f.loc[1, "h_sota5"] == 2  # sadece önceki maç
+    assert f.loc[6, "h_sot5"] == np.mean([5, 6, 7, 8, 9])  # kendi maçı (10) dahil değil
+    assert f.loc[1, "a_sot5"] == 2 and f.loc[1, "a_sota5"] == 4
+    assert np.isnan(f.loc[4, "h_xi_core"]) and f.loc[5, "h_xi_core"] == 1.0  # en az 5 ilk 11 gerekir
+    assert f.loc[6, "h_xi_core"] == 8 / 11 and f.loc[6, "h_xi_changes"] == 3

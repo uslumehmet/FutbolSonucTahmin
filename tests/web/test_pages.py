@@ -195,3 +195,18 @@ def test_static_files_cached_by_browser(client_seeded):
     r = client_seeded.get("/static/app.css?v=1")
     assert r.status_code == 200 and "immutable" in r.headers["cache-control"]
     assert "max-age=86400" in client_seeded.get("/static/app.css").headers["cache-control"]
+
+
+def test_match_page_shows_stats_and_lineups(client_seeded, session_factory):
+    from app.models import Match
+    with session_factory() as s:
+        m = s.query(Match).filter_by(status="scheduled").first()
+        m.status, m.home_goals, m.away_goals = "finished", 1, 0
+        m.stats = {"shots": [12.0, 7.0], "sot": [5.0, 2.0], "poss": [58.4, 41.6],
+                   "xi_home": [[str(i), f"Ev Oyuncu {i}", "M"] for i in range(11)],
+                   "xi_away": [[str(i), f"Dep Oyuncu {i}", "D"] for i in range(11)]}
+        s.commit()
+        mid = m.id
+    html = client_seeded.get(f"/mac/{mid}").text
+    assert "Maç istatistikleri" in html and "İsabetli şut" in html and "%58" in html
+    assert "Ev Oyuncu 3" in html and "Dep Oyuncu 10" in html

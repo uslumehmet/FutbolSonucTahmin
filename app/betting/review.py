@@ -115,7 +115,7 @@ def _failure_line(prob: float) -> str:
 
 
 def review_pick(market: str, prob: float, odds: float | None, result: str, status: str, hg: int | None,
-                ag: int | None, home: str, away: str, pred) -> PickReview:
+                ag: int | None, home: str, away: str, pred, stats: dict | None = None) -> PickReview:
     r = PickReview(needed=condition(market, home, away))
     finished = status == "finished" and hg is not None and ag is not None
     if result == "void":
@@ -132,7 +132,23 @@ def review_pick(market: str, prob: float, odds: float | None, result: str, statu
     r.lines.append(_chance_line(prob, odds))
     if result == "lost":
         r.lines.append(_failure_line(prob))
+    if finished and stats:
+        line = stats_line(stats, home, away)
+        if line:
+            r.lines.insert(0, line)
     return r
+
+
+def stats_line(stats: dict, home: str, away: str) -> str | None:
+    """"Maç istatistiği: şut Wales 9 – 24 Portugal, isabetli şut 4 – 6, topla oynama %38 – %62"."""
+    parts = []
+    if stats.get("shots"):
+        parts.append(f"şut {home} {stats['shots'][0]:.0f} – {stats['shots'][1]:.0f} {away}")
+    if stats.get("sot"):
+        parts.append(f"isabetli şut {stats['sot'][0]:.0f} – {stats['sot'][1]:.0f}")
+    if stats.get("poss"):
+        parts.append(f"topla oynama %{stats['poss'][0]:.0f} – %{stats['poss'][1]:.0f}")
+    return "Maç istatistiği: " + ", ".join(parts) if parts else None
 
 
 def reviews_for(session, picks) -> dict[int, PickReview]:
@@ -153,5 +169,5 @@ def reviews_for(session, picks) -> dict[int, PickReview]:
             or [x for x in preds if x.created_at <= m.kickoff_utc]
         pred = before[-1] if before else None
         out[p.id] = review_pick(p.market, p.prob, p.odds, p.result, m.status, m.home_goals, m.away_goals,
-                                m.home_team.name, m.away_team.name, pred)
+                                m.home_team.name, m.away_team.name, pred, m.stats or {})
     return out
