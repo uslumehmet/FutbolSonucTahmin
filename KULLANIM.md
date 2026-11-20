@@ -21,13 +21,13 @@ Bilgisayar kapalıyken sistem çalışmaz. Açtığınızda kaçırdığı işle
 Anahtar olmadan yaklaşan maçlar, oranlar ve sakat/cezalı listeleri gelmez; geçmiş veriler ve test raporu yine görünür.
 
 ## Sistem ne zaman ne yapar (Türkiye saati)
-Site bulutta çalışırken işler GitHub'da yapılır; GitHub bazen 5–30 dakika geç başlatır.
+Site bulutta çalışırken işler GitHub'da yapılır. İşleri cron-job.org saatinde başlatır; GitHub'ın kendi zamanlaması yedektir.
 
 | Saat | İş |
 |---|---|
-| 09:07 | Biten maçlar sonuçlandırılır; yaklaşan maçlar, oranlar, eksik oyuncular ve tahminler güncellenir |
-| 11:07 | Sistem iki moddan (Güvenli, Değerli) 2, 3 ve 5 oranlı kuponları sanal kasalarla oynar (12:37'de yedek deneme) |
-| 15:07, 20:07, 00:37 | Biten maçlar sonuçlandırılır |
+| 09:10 | Biten maçlar sonuçlandırılır; yaklaşan maçlar, oranlar, eksik oyuncular ve tahminler güncellenir |
+| 11:10 | Sistem iki moddan (Güvenli, Değerli) 2, 3 ve 5 oranlı kuponları sanal kasalarla oynar |
+| 15:10, 20:10, 23:10 | Biten maçlar sonuçlandırılır; maçına 6 saatten az kalan maçların oranı ve tahmini yenilenir |
 | Haftada bir | Modeller yeniden eğitilir |
 
 Site sadece bilgisayarda çalıştırılırsa saatler biraz farklıdır: 10:30 güncelleme, 11:00 otomatik oyun, 09:00/15:00/20:00/00:30 sonuçlandırma, Pazartesi 03:00 yeniden eğitim.

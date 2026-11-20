@@ -144,14 +144,18 @@ Kurulum bitince site `https://futbol-sonuc-tahmin-....onrender.com` gibi bir adr
 
 **6. Bilgisayardaki otomatik başlatmayı kapatın.** `shell:startup` klasöründeki `arka_plan.vbs` kısayolunu silin. İki sistem birden çalışırsa günlük 100 API isteğini paylaşırlar ve bilgisayardaki eski veritabanı ayrı kupon oynar.
 
-**Buluttaki takvim (Türkiye saati).** GitHub zamanlanmış işleri bazen 5–30 dakika geciktirir; her çalışma zamanı gelmiş ne varsa yapar, kaçan bir iş sonrakinde tamamlanır.
+**Buluttaki takvim (Türkiye saati).** GitHub'ın kendi zamanlaması saatlerce gecikebiliyor. Bu yüzden iş akışı dışarıdan, ücretsiz [cron-job.org](https://cron-job.org) ile saatinde başlatılır. Kurulum:
+- GitHub'da *Settings* → *Developer settings* → *Fine-grained tokens* altında yeni anahtar açın: sadece bu depo, *Actions: Read and write*.
+- cron-job.org'da yeni iş açın: adres `https://api.github.com/repos/<kullanıcı>/<depo>/actions/workflows/gorevler.yml/dispatches`, yöntem POST, gövde `{"ref":"main"}`.
+- Başlıklar: `Accept: application/vnd.github+json`, `Content-Type: application/json`, `X-GitHub-Api-Version: 2022-11-28`, `Authorization: Bearer <anahtar>`.
+
+İş akışındaki zamanlamalar yedektir. Her çalışma zamanı gelmiş ne varsa yapar; kaçan bir iş sonrakinde tamamlanır.
 
 | Saat | İş |
 |---|---|
-| 09:07 | Sonuçlandırma, günlük güncelleme (maçlar, oranlar, eksikler, tahminler) |
-| 11:07 | Otomatik oyun (başlamasına en az 1 saat olan maçlarla) |
-| 12:37 | Yedek: 11:07 gecikti ya da atlandıysa tamamlar |
-| 15:07, 20:07, 00:37 | Sonuçlandırma |
+| 09:10 | Sonuçlandırma, günlük güncelleme (maçlar, oranlar, eksikler, tahminler) |
+| 11:10 | Otomatik oyun (başlamasına en az 1 saat olan maçlarla) |
+| 15:10, 20:10, 23:10 | Sonuçlandırma; maçına 6 saatten az kalan maçların oranı ve tahmini yenilenir |
 | Haftada bir | Modeller yeniden eğitilir; Salı ve Cuma openfootball ve milli maç verileri yenilenir |
 
 **Bilinmesi gerekenler**
