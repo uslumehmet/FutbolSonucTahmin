@@ -35,7 +35,7 @@ Site sadece bilgisayarda çalıştırılırsa saatler biraz farklıdır: 10:30 g
 ## Sayfalar
 - **Maçlar:** Her maçın 1-X-2 ihtimal çubuğu, toplam gol 1.5/2.5 Üst, KG Var ve iki takımın ayrı ayrı 1.5 Üst ihtimali, Güvenli/Değerli seçimi. "7 gün" sekmesi haftanın bütün maçlarını gösterir; "oran 1 gün önce gelir" etiketli maçlar sezon fikstüründen gelmiştir, saatleri değişebilir.
 - **Maç detayı:** Bütün bahis seçenekleri (ihtimal, oran, değer; oran geldiyse ihtimalin altında küçük harfle modelin kendi tahmini), gerekçe, iki takımın son maçları, aralarındaki maçlar, eksik oyuncular. Eksik oyuncuyu elle ekleyebilirsiniz; tahmin hemen güncellenir. "Toplam gol 1.5 Alt" iki takımın gollerinin toplamıdır; "Galler golleri 1.5 Alt" gibi takım adıyla yazanlar sadece o takımın gollerini sayar.
-- **Kupon oluştur:** Hedef oran + mod seçin, sistem en yüksek tutma ihtimalli kuponu kurar; sanal kasanızla oynarsınız.
+- **Kupon oluştur:** Hedef oran + mod seçin, sistem en yüksek tutma ihtimalli kuponu kurar; sanal kasanızla oynarsınız. "En düşük tutma ihtimali" (ör. %75) seçerseniz kupona sadece en az o ihtimaldeki seçimler girer. Kurulan kupondan istemediğiniz maçı × ile çıkarabilirsiniz; toplam oran ve tutma ihtimali yeniden hesaplanır.
 - **Kuponlarım:** Her kasanın kuponları, tuttu/tutmadı durumu. Üstte sistemin bugünkü otomatik oyununun ne zaman yapıldığı, kaç kupon oynandığı, oynanmadıysa nedeni ve sıradaki maç günü yazar. Otomatik oyun gecikirse, henüz başlamamış maçlarla (başlamasına en az 1 saat olan) yapılır.
 - **Kasalar:** 100 ₺ ve 1.000 ₺ gibi farklı başlangıçlı kasalar; istediğiniz kadar yenisini açabilirsiniz.
 - **Performans:** Hangi mod kazandırıyor, model söylediği ihtimallerde ne kadar isabetli, geçmiş test raporu.
