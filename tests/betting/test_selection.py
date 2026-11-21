@@ -122,3 +122,23 @@ def test_match_candidates_carry_low_data_flag(session):
     session.commit()
     cands = match_candidates(session, NOW, NOW + timedelta(days=3), DEFAULT_SETTINGS)
     assert all(c.low_data for c in cands[ids[0]]) and not any(c.low_data for c in cands[ids[1]])
+
+
+def test_sectioned_orders_by_market_sections():
+    from app.betting.selection import sectioned
+
+    alt, ms1 = Candidate(1, "ALT25", 1.8, 0.6), Candidate(1, "MS1", 1.5, 0.7)
+    assert sectioned([alt, ms1]) == [("Maç sonucu", [ms1]), ("Toplam gol", [alt])]
+
+
+def test_candidates_for_match_matches_match_candidates(session):
+    from app.betting.selection import candidates_for_match
+
+    ids = seed_synthetic_league(session, upcoming=2)
+    predict_upcoming(session, ModelStore(session), NOW)
+    all_cands = match_candidates(session, NOW, NOW + timedelta(days=3), DEFAULT_SETTINGS)
+    m = session.get(Match, ids[0])
+    assert candidates_for_match(session, m, DEFAULT_SETTINGS) == all_cands[m.id]
+    session.query(OddsQuote).filter_by(match_id=m.id).delete()
+    session.commit()
+    assert candidates_for_match(session, m, DEFAULT_SETTINGS) == []

@@ -87,19 +87,33 @@ def latest_odds(session, match_id: int) -> tuple[str, dict[str, float]] | None:
 
 
 def match_candidates(session, start: datetime, end: datetime, s: Settings) -> dict[int, list[Candidate]]:
-    from app.model.predict import latest_prediction
-
     out: dict[int, list[Candidate]] = {}
     matches = (session.query(Match)
                .filter(Match.status == "scheduled", Match.unmatched.is_(False),
                        Match.kickoff_utc >= start, Match.kickoff_utc < end)
                .order_by(Match.kickoff_utc).all())
     for m in matches:
-        pred = latest_prediction(session, m.id)
-        lo = latest_odds(session, m.id)
-        if pred is None or not pred.probs or lo is None:
-            continue
-        cands = candidates_for(m.id, pred.probs, lo[1], s.odds_adjust_pct, "veri az" in (pred.flags or []))
+        cands = candidates_for_match(session, m, s)
         if cands:
             out[m.id] = cands
     return out
+
+
+def candidates_for_match(session, match: Match, s: Settings) -> list[Candidate]:
+    """Bir maçın oranı olan bütün bahisleri, son tahmin ve son oranla (kupon kurulurken kullanılan sayılar)."""
+    from app.model.predict import latest_prediction
+
+    pred = latest_prediction(session, match.id)
+    lo = latest_odds(session, match.id)
+    if pred is None or not pred.probs or lo is None:
+        return []
+    return candidates_for(match.id, pred.probs, lo[1], s.odds_adjust_pct, "veri az" in (pred.flags or []))
+
+
+def sectioned(cands: list[Candidate]) -> list[tuple[str, list[Candidate]]]:
+    """Adayları maç sayfasındaki bölümlere ayırır (Maç sonucu, Çifte şans, ...); boş bölüm yok."""
+    from app.model.markets import MARKET_SECTIONS
+
+    by_key = {c.market: c for c in cands}
+    out = [(title, [by_key[k] for k in keys if k in by_key]) for title, keys in MARKET_SECTIONS]
+    return [(title, items) for title, items in out if items]
