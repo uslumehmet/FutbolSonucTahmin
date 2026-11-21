@@ -119,3 +119,102 @@ def test_merge_team_removes_planned_duplicate_of_api_match(session):
     assert (kept.home_team_id, kept.away_team_id, kept.unmatched) == (gs.id, canon.id, False)
     assert session.query(Prediction).filter_by(match_id=planned_id).count() == 0
     assert session.query(MissingPlayer).filter_by(match_id=api_id, player_name="Elle eklenen").count() == 1
+
+
+def _amed(session):
+    """openfootball + API adı olan, lige yeni çıkmış bir takım; bir API maçı ve bir openfootball maçı."""
+    from app.data.teams import add_alias
+
+    amed = get_or_create_team(session, "of", "Amed", "club")
+    add_alias(session, amed.id, "api", "Amed SK")
+    amed.api_id = 3579
+    gs = get_or_create_team(session, "of", "Galatasaray", "club")
+    api_m = _match(session, amed, gs, unmatched=False)
+    api_m.api_fixture_id = 777
+    of_m = _match(session, gs, amed, unmatched=False)
+    session.commit()
+    return amed, gs, api_m, of_m
+
+
+def test_unmatch_splits_api_identity(session):
+    from app.data.teams import unmatch_team
+    from app.models import TeamAlias
+
+    amed, gs, api_m, of_m = _amed(session)
+    temp_id = unmatch_team(session, amed.id)
+    temp = session.get(Team, temp_id)
+    assert temp is not None and temp.is_temp and temp.api_id == 3579 and temp.name == "Amed"
+    session.refresh(api_m)
+    session.refresh(of_m)
+    assert api_m.home_team_id == temp_id and api_m.unmatched is True
+    assert of_m.away_team_id == amed.id and of_m.unmatched is False
+    assert session.get(Team, amed.id).api_id is None
+    assert {a.source for a in session.query(TeamAlias).filter_by(team_id=temp_id)} == {"api"}
+    assert {a.source for a in session.query(TeamAlias).filter_by(team_id=amed.id)} == {"of"}
+
+
+def test_rematch_restores_everything(session):
+    from app.data.teams import unmatch_team
+
+    amed, gs, api_m, of_m = _amed(session)
+    temp_id = unmatch_team(session, amed.id)
+    merge_team(session, temp_id, amed.id)
+    session.refresh(api_m)
+    assert api_m.home_team_id == amed.id and api_m.unmatched is False
+    assert session.get(Team, temp_id) is None
+    assert session.get(Team, amed.id).api_id == 3579
+    assert resolve_team(session, "api", "Amed SK", []).id == amed.id
+
+
+def test_unmatch_api_only_team_becomes_temp(session):
+    from app.data.teams import add_alias, unmatch_team
+
+    t = Team(name="Ümraniyespor", kind="club", api_id=3577)
+    session.add(t)
+    session.flush()
+    add_alias(session, t.id, "api", "Ümraniyespor")
+    gs = get_or_create_team(session, "of", "Galatasaray", "club")
+    m = _match(session, t, gs, unmatched=False)
+    before = session.query(Team).count()
+    assert unmatch_team(session, t.id) == t.id
+    session.refresh(m)
+    assert session.get(Team, t.id).is_temp is True and m.unmatched is True
+    assert session.query(Team).count() == before
+
+
+def test_unmatch_without_api_identity_does_nothing(session):
+    from app.data.teams import unmatch_team
+
+    corum = get_or_create_team(session, "of", "Çorum", "club")
+    assert unmatch_team(session, corum.id) is None
+    assert session.get(Team, corum.id).is_temp is False
+
+
+def test_api_ingest_after_unmatch_stays_unmatched(session):
+    from app.data.ingest_api import _api_team
+    from app.data.teams import unmatch_team
+
+    amed, gs, api_m, of_m = _amed(session)
+    temp_id = unmatch_team(session, amed.id)
+    comp = session.query(Competition).filter_by(code="T1").one()
+    assert _api_team(session, comp, "Amed SK", 3579, 2026).id == temp_id
+
+
+def test_promoted_teams(session):
+    from datetime import date
+
+    from app.data.teams import promoted_teams
+
+    comp = session.query(Competition).filter_by(code="T1").one()
+    old, new, temp = (get_or_create_team(session, "of", n, "club") for n in ("Galatasaray", "Amed", "Geçici"))
+    temp.is_temp = True
+
+    def play(season, home, away):
+        session.add(Match(competition_id=comp.id, season=season, home_team_id=home.id, away_team_id=away.id,
+                          kickoff_utc=datetime(season, 10, 1, tzinfo=timezone.utc), stats={}))
+
+    play(2025, old, old)
+    play(2026, old, new)
+    play(2026, temp, old)
+    session.commit()
+    assert [(c.code, t.name) for c, t in promoted_teams(session, date(2026, 11, 22))] == [("T1", "Amed")]

@@ -151,6 +151,9 @@ def merge_team(session, temp_team_id: int, canonical_team_id: int) -> None:
     from app.models import MissingPlayer
 
     session.query(MissingPlayer).filter_by(team_id=temp_team_id).update({"team_id": canonical_team_id})
+    canonical = session.get(Team, canonical_team_id)
+    if temp.api_id and canonical is not None and canonical.api_id is None:
+        canonical.api_id = temp.api_id  # API bir sonraki güncellemede de bu takımı bulsun (eşleştirme geri alındıysa)
     session.flush()
     session.delete(temp)
     session.flush()
@@ -182,6 +185,79 @@ def _drop_planned_duplicates(session, team_id: int) -> None:
             session.query(Prediction).filter_by(match_id=d.id).delete()
             session.delete(d)
     session.flush()
+
+
+def unmatch_team(session, team_id: int) -> int | None:
+    """Takımın API eşleştirmesini kaldırır; takım Ayarlar'daki "Eşleşmeyen takımlar"a döner.
+
+    API dışı adı (openfootball, ESPN, milli maç) olan takımda API kimliği (API adları, api_id ve API'den gelen
+    maçlar) yeni bir geçici takıma ayrılır; diğer maçlar yerinde kalır. Bir sonraki API güncellemesi takımı
+    api_id ile bu geçici kayıtta bulur, kendiliğinden yeniden eşleşmez. Sadece API adı olan takım (API'nin açıp
+    "Ligi yeni çıktı" ile onaylanan) geçici yapılır. API bağlantısı yoksa bir şey yapmaz, None döner.
+    Döndürdüğü: Eşleşmeyen takımlar listesinde görünecek takımın id'si.
+    """
+    from app.models import MissingPlayer
+
+    team = session.get(Team, team_id)
+    if team is None:
+        return None
+    aliases = session.query(TeamAlias).filter_by(team_id=team_id).all()
+    api_aliases = [a for a in aliases if a.source == "api"]
+    if not api_aliases and team.api_id is None:
+        return None
+    of_team = or_(Match.home_team_id == team_id, Match.away_team_id == team_id)
+    if all(a.source == "api" for a in aliases):
+        team.is_temp = True
+        session.query(Match).filter(of_team).update({"unmatched": True}, synchronize_session=False)
+        session.commit()
+        return team_id
+    temp = Team(name=team.name, kind=team.kind, country=team.country, is_temp=True, api_id=team.api_id)
+    team.api_id = None
+    session.add(temp)
+    session.flush()
+    for a in api_aliases:
+        a.team_id = temp.id
+    moved = session.query(Match).filter(of_team, Match.api_fixture_id.isnot(None)).all()
+    for m in moved:
+        if m.home_team_id == team_id:
+            m.home_team_id = temp.id
+        if m.away_team_id == team_id:
+            m.away_team_id = temp.id
+        m.unmatched = True
+    if moved:
+        session.query(MissingPlayer).filter(MissingPlayer.team_id == team_id,
+                                            MissingPlayer.match_id.in_([m.id for m in moved])
+                                            ).update({"team_id": temp.id}, synchronize_session=False)
+    session.commit()
+    return temp.id
+
+
+def promoted_teams(session, today) -> list[tuple]:
+    """Her kulüp liginde bu sezon oynayıp geçen sezon o ligde oynamayan takımlar (lige yeni çıkanlar).
+
+    Geçici takımlar hariç (onlar "Eşleşmeyen takımlar"da). Geçen sezonun verisi olmayan lig atlanır.
+    """
+    from app.config import CLUB_LEAGUES, current_season_start
+    from app.models import Competition
+
+    season = current_season_start(today)
+
+    def team_ids(comp_id: int, s: int) -> set[int]:
+        rows = session.query(Match.home_team_id, Match.away_team_id).filter_by(competition_id=comp_id, season=s)
+        return {tid for row in rows for tid in row}
+
+    out = []
+    for lg in CLUB_LEAGUES:
+        comp = session.query(Competition).filter_by(code=lg.code).one_or_none()
+        if comp is None:
+            continue
+        before = team_ids(comp.id, season - 1)
+        new = team_ids(comp.id, season) - before
+        if not before or not new:
+            continue
+        teams = session.query(Team).filter(Team.id.in_(new), Team.is_temp.is_(False)).order_by(Team.name).all()
+        out += [(comp, t) for t in teams]
+    return out
 
 
 def confirm_new_team(session, team_id: int) -> None:
