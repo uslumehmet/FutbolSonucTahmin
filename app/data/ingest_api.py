@@ -171,27 +171,42 @@ def _fetch_player_stats(session, api, rep: IngestReport, now: datetime | None = 
     if now is not None:
         q = q.filter(Match.kickoff_utc >= now)  # oynanmış maçların eksikleri artık tahmini değiştirmez
     rows = q.order_by(Match.kickoff_utc).all()  # önce en yakın maçlar
+    # Bütçe istek sayısıdır (oyuncu sayısı değil): bir oyuncu reddedilen sezon + izin verilen sezon diye
+    # 2 istek tutabilir. 21 Kasım'da oyuncu başına sayıldığı için sonuçlandırma payı da harcandı.
     budget = player_lookup_budget(api)
-    done = 0
+    used = 0
+    allowed_for: dict[int, int] = {}  # planın kapattığı sezon -> izin verilen son sezon (bir kez öğrenilir)
+
+    def share_used() -> bool:
+        if used < budget:
+            return False
+        rep.fallbacks.append(f"oyuncu istatistikleri: günlük kota payı doldu ({used} istek), kalanlar sonraki güncellemede")
+        return True
+
     for mp, m in rows:
         if session.get(PlayerSeasonStat, (mp.api_player_id, m.season)) is not None:
             continue
-        if done >= budget:
-            rep.fallbacks.append(f"oyuncu istatistikleri: günlük kota payı doldu ({done} istek), kalanlar sonraki güncellemede")
+        if share_used():
             break
         team = session.get(Team, mp.team_id)
-        approx = False
+        season = allowed_for.get(m.season, m.season)
+        approx = season != m.season
         try:
-            item = api.player_season(mp.api_player_id, m.season)
+            used += 1
+            item = api.player_season(mp.api_player_id, season)
         except QuotaExceeded:
             rep.fallbacks.append("oyuncu istatistikleri: kota doldu")
             return
         except ApiError as exc:
-            allowed = _allowed_season(str(exc))
+            allowed = None if approx else _allowed_season(str(exc))
             if allowed is None:
                 rep.errors.append(f"oyuncu {mp.player_name}: {exc}")
                 continue
+            allowed_for[m.season] = allowed  # sonraki oyuncular reddedilecek isteği hiç atmaz
+            if share_used():
+                break
             try:
+                used += 1
                 item = api.player_season(mp.api_player_id, allowed)
                 approx = True
             except QuotaExceeded:
@@ -200,7 +215,6 @@ def _fetch_player_stats(session, api, rep: IngestReport, now: datetime | None = 
             except ApiError as exc2:
                 rep.errors.append(f"oyuncu {mp.player_name}: {exc2}")
                 continue
-        done += 1
         parsed = parse_api_player(item, team.api_id if team else None) if item else None
         if parsed is None:
             parsed = {"position": "M", "minutes": 0, "goals": 0, "assists": 0}

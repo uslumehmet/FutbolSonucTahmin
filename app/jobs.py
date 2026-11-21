@@ -108,12 +108,34 @@ def settle_job(sf, now: datetime) -> None:
 
     with _LOCK, sf() as s:
         api = make_api(s)
-        ingest_results(s, api, now)
-        _report(s, "last_settle", settle_all(s, now), now)
+        res = ingest_results(s, api, now)
+        errors, fallbacks = list(res.errors), []
+        if api is None or res.errors:
+            # API sonuç veremedi (kota doldu, hata): biten maçlar ESPN'den, API kotası harcanmaz.
+            # 21 Kasım: kota sabah dolunca bütün gün hiçbir kupon sonuçlanmadı, tik/çarpı ertesi sabaha kaldı.
+            fb, err = _espn_results(s, now)
+            fallbacks += fb
+            errors += err
+        report = asdict(settle_all(s, now))
+        report.update(errors=errors, fallbacks=fallbacks)
+        _report(s, "last_settle", report, now)
         try:  # artan kotayla maça yakın oranlar; hata verirse sonuçlandırma etkilenmez
             late_odds_update(s, api, now)
         except Exception:  # noqa: BLE001
             log.exception("maça yakın oran yenileme hatası")
+
+
+def _espn_results(s, now: datetime) -> tuple[list[str], list[str]]:
+    """Dünün ve bugünün biten kulüp maçlarını ESPN'den yazar. Milli maçlar ESPN'de yok."""
+    from app.data import espn
+
+    try:
+        es = espn.ingest_espn(s, now.astimezone(TZ).date(), recent_days=1, live=True, max_requests=20)
+    except Exception as exc:  # noqa: BLE001 - yedek kaynak sonuçlandırmayı durdurmamalı
+        log.exception("ESPN sonuç hatası")
+        return [], [f"ESPN: {exc}"]
+    errors = [f"ESPN: {e}" for e in es.errors] + [f"ESPN eşleşmeyen: {u}" for u in es.unresolved]
+    return [f"sonuçlar ESPN'den: {es.results} maç"], errors
 
 
 def late_odds_update(s, api, now: datetime) -> int:

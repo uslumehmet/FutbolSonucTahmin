@@ -204,3 +204,31 @@ def test_slim_summary_keeps_what_parse_needs():
     slim = slim_summary(text)
     assert len(slim) < len(text) / 3
     assert parse_summary(slim) == parse_summary(text)
+
+
+def test_live_mode_reads_today_with_short_cache(session, tmp_espn):
+    """Sonuçlandırma (API kotası dolunca): bugünün biten maçları da okunur, dosya kısa süre saklanır."""
+    comp, t, plan, api = _setup(session)
+    plan.kickoff_utc = datetime(2026, 11, 20, 13, 0, tzinfo=UTC)
+    session.commit()
+    cal = ["2026-10-18T07:00Z", "2026-11-20T07:00Z"]
+    pages = {"20261015": _board(2026, cal, []),
+             "20261120": _board(2026, cal, [_event("Kasimpasa", "Samsunspor", 2, 0, when="2026-11-20T13:00Z"),
+                                           _event("Goztepe", "Kocaelispor", 0, 0, when="2026-11-20T17:00Z", done=False)])}
+    ages = {}
+
+    def fetch(url, dest, max_age):
+        key = url.rsplit("=", 1)[1]
+        ages[key] = max_age
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(pages[key], encoding="utf-8")
+        return pages[key]
+
+    ingest_espn(session, TODAY, codes=["T1"], recent_days=1, fetch=fetch)
+    assert "20261120" not in ages  # günlük güncelleme bugünü okumaz
+    rep = ingest_espn(session, TODAY, codes=["T1"], recent_days=1, live=True, fetch=fetch)
+    session.refresh(plan)
+    assert (plan.status, plan.home_goals, plan.away_goals) == ("finished", 2, 0)
+    assert rep.results == 1  # bitmemiş maç yazılmaz
+    assert ages["20261120"] <= espn.LIVE_MAX_AGE
+    assert "T1:20261120" not in get_value(session, "espn_done")  # bugün kesinleşmiş sayılmaz

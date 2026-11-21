@@ -106,3 +106,69 @@ def test_late_odds_update_repredicts_with_fresh_odds(session, monkeypatch):
     assert p.probs["MS1"] > 0.55  # yeni oran ev sahibini açık favori gösteriyor (1.50)
     assert session.query(Prediction).filter_by(match_id=m.id).count() == 1
     assert NOW < now
+
+
+def _settle_setup(session_factory, monkeypatch, api_errors):
+    """Kullanıcı kuponu: bugünkü maçta MS 1. API sonuç veremezse ESPN'den gelen sonuçla tik/çarpı oluşmalı."""
+    from datetime import UTC, date
+
+    from app.data import espn as espn_mod
+    from app.data import ingest_api
+    from app.data.ingest_api import IngestReport
+    from app.models import Bet, Competition, Coupon, CouponPick, Match, Team, Wallet
+
+    with session_factory() as s:
+        comp = s.query(Competition).filter_by(code="T1").one()
+        a, b = Team(name="Ev", kind="club"), Team(name="Dep", kind="club")
+        s.add_all([a, b])
+        s.flush()
+        m = Match(competition_id=comp.id, season=2026, kickoff_utc=datetime(2026, 11, 21, 13, 0, tzinfo=UTC),
+                  home_team_id=a.id, away_team_id=b.id, status="scheduled", stats={})
+        w = Wallet(name="Benim Kasam", owner="user", start_balance=100000, balance=99000, stake_rule="fixed",
+                   stake_value=1000)
+        s.add_all([m, w])
+        s.flush()
+        c = Coupon(mode="safe", source="user", target_odds=2, total_odds=1.5, prob=0.6, status="open",
+                   play_date=date(2026, 11, 21))
+        c.picks = [CouponPick(match_id=m.id, market="MS1", odds=1.5, prob=0.6)]
+        s.add(c)
+        s.flush()
+        s.add(Bet(wallet_id=w.id, coupon_id=c.id, stake=1000))
+        s.commit()
+        match_id, pick_id = m.id, c.picks[0].id
+
+    monkeypatch.setattr(jobs, "make_api", lambda s: object())
+    monkeypatch.setattr(ingest_api, "ingest_results",
+                        lambda s, api, now: IngestReport(errors=list(api_errors)))
+    espn_calls = []
+
+    def fake_espn(s, today, **kw):
+        espn_calls.append((today, kw))
+        m = s.get(Match, match_id)
+        m.status, m.home_goals, m.away_goals = "finished", 2, 0
+        s.commit()
+        return espn_mod.EspnReport(results=1)
+
+    monkeypatch.setattr(espn_mod, "ingest_espn", fake_espn)
+    monkeypatch.setattr(jobs, "late_odds_update", lambda s, api, now: 0)
+    return pick_id, espn_calls
+
+
+def test_settle_uses_espn_when_api_quota_is_out(session_factory, monkeypatch):
+    from app.config import get_value
+    from app.models import CouponPick
+
+    pick_id, espn_calls = _settle_setup(session_factory, monkeypatch, ["sonuçlar: kota doldu"])
+    now = datetime(2026, 11, 21, 20, 10, tzinfo=TZ)
+    jobs.settle_job(session_factory, now)
+    assert len(espn_calls) == 1 and espn_calls[0][1].get("live") is True
+    with session_factory() as s:
+        assert s.get(CouponPick, pick_id).result == "won"
+        rep = get_value(s, "last_settle")
+    assert rep["picks"] == 1 and "sonuçlar: kota doldu" in rep["errors"]
+
+
+def test_settle_skips_espn_when_api_works(session_factory, monkeypatch):
+    _, espn_calls = _settle_setup(session_factory, monkeypatch, [])
+    jobs.settle_job(session_factory, datetime(2026, 11, 21, 20, 10, tzinfo=TZ))
+    assert espn_calls == []

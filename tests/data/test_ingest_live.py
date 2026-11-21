@@ -277,3 +277,60 @@ def test_refresh_late_odds_near_kickoff_within_quota(session):
     api.clock = lambda: later + timedelta(hours=1, minutes=30)
     api.daily_limit = api.used_today() + 10  # artan kota yok: sonuçlandırma payı korunur
     assert refresh_late_odds(session, api, later + timedelta(hours=1, minutes=30)) == []
+
+
+class _PlayerApi:
+    """player_season isteklerini sayar; ücretsiz plan gibi 2024 dışındaki sezonları reddeder."""
+    daily_limit = 100
+
+    def __init__(self, used=0):
+        self.calls = []
+        self.used = used
+
+    def remaining_today(self):
+        return self.daily_limit - self.used - len(self.calls)
+
+    def player_season(self, player_id, season):
+        from app.data.api_football import ApiError
+        self.calls.append((player_id, season))
+        if season != 2024:
+            raise ApiError(str(PLAN_ERR["errors"]))
+        return None
+
+
+def _missing_players(session, n):
+    _seed_teams(session)
+    comp = session.query(Competition).filter_by(code="T1").one()
+    home = session.query(Team).filter_by(name="Galatasaray").one()
+    away = session.query(Team).filter_by(name="Fenerbahçe").one()
+    m = Match(competition_id=comp.id, season=2026, kickoff_utc=NOW + timedelta(days=1), home_team_id=home.id,
+              away_team_id=away.id, status="scheduled", stats={})
+    session.add(m)
+    session.flush()
+    session.add_all([MissingPlayer(match_id=m.id, team_id=home.id, player_name=f"P{i}", api_player_id=1000 + i,
+                                   source="api", active=True) for i in range(n)])
+    session.commit()
+
+
+def test_player_stats_try_blocked_season_once(session):
+    """Plan bu sezonu kapatıyorsa her oyuncu için önce reddedilecek istek atılmaz (21 Kasım: 36 boş istek)."""
+    from app.data.ingest_api import IngestReport, _fetch_player_stats
+
+    _missing_players(session, 5)
+    api = _PlayerApi()
+    _fetch_player_stats(session, api, IngestReport(), NOW)
+    assert api.calls == [(1000, 2026)] + [(1000 + i, 2024) for i in range(5)]
+    assert all(session.get(PlayerSeasonStat, (1000 + i, 2026)) for i in range(5))
+
+
+def test_player_stats_budget_counts_requests_not_players(session):
+    """Sonuçlandırma payı (API_RESERVE) oyuncu istatistiğine harcanmaz: bütçe istek sayısıdır."""
+    from app.data.ingest_api import API_RESERVE, IngestReport, _fetch_player_stats
+
+    _missing_players(session, 10)
+    api = _PlayerApi(used=100 - API_RESERVE - 4)  # oyunculara 4 istek kalıyor
+    rep = IngestReport()
+    _fetch_player_stats(session, api, rep, NOW)
+    assert len(api.calls) == 4
+    assert api.remaining_today() == API_RESERVE
+    assert any("kota payı" in f for f in rep.fallbacks)

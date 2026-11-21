@@ -29,6 +29,7 @@ SLUGS = {"T1": "tur.1", "E0": "eng.1", "SP1": "esp.1", "D1": "ger.1", "I1": "ita
 ESPN_DIR = RAW_DIR / "espn"
 DONE_KEY = "espn_done"  # işlenmiş ve bir daha değişmeyecek günler: "T1:20261018"
 SETTLED_AFTER = timedelta(days=2)  # bu kadar eski günler kesinleşmiş sayılır (dosya bir daha indirilmez)
+LIVE_MAX_AGE = timedelta(minutes=30)  # sonuçlandırmada bugün ve dün: maçlar biterken dosya kısa süre saklanır
 
 
 @dataclass
@@ -161,11 +162,14 @@ def _fetch(url, dest, max_age, fetch, rep: EspnReport, max_requests: int) -> str
 
 
 def ingest_espn(session, today: date, codes: list[str] | None = None, seasons: list[int] | None = None,
-                recent_days: int | None = None, fetch=fetch_text, max_requests: int = 150) -> EspnReport:
+                recent_days: int | None = None, fetch=fetch_text, max_requests: int = 150,
+                live: bool = False) -> EspnReport:
     """ESPN'den biten maçları yükler.
 
     seasons verilmezse bu sezon. recent_days verilirse sadece son o kadar günün maç günleri (günlük iş).
     max_requests: bu çalışmada en fazla kaç dosya indirilir (önbellekteki dosyalar sayılmaz).
+    live: sonuçlandırma için (API kotası dolunca); bugünün biten maçları da okunur, kesinleşmemiş günlerin
+    dosyası en fazla LIVE_MAX_AGE saklanır.
     """
     rep = EspnReport()
     seed_aliases(session)  # aliases.csv'deki "espn" satırları (ör. Erzurum BB → BB Erzurumspor)
@@ -192,7 +196,7 @@ def ingest_espn(session, today: date, codes: list[str] | None = None, seasons: l
             if got_season is not None and got_season != season:
                 rep.errors.append(f"{lg.name} {season}: ESPN başka sezon döndürdü ({got_season})")
                 continue
-            days = [d for d in calendar if d < today and f"{lg.code}:{d:%Y%m%d}" not in done]
+            days = [d for d in calendar if (d <= today if live else d < today) and f"{lg.code}:{d:%Y%m%d}" not in done]
             if recent_days is not None:
                 days = [d for d in days if d >= today - timedelta(days=recent_days)]
             rows, finished_days = [], []
@@ -200,7 +204,8 @@ def ingest_espn(session, today: date, codes: list[str] | None = None, seasons: l
                 settled = today - d >= SETTLED_AFTER
                 try:
                     text = _fetch(day_url(slug, d), ESPN_DIR / lg.code / f"{d:%Y%m%d}.json",
-                                  None if settled else timedelta(hours=6), fetch, rep, max_requests)
+                                  None if settled else LIVE_MAX_AGE if live else timedelta(hours=6),
+                                  fetch, rep, max_requests)
                 except (httpx.HTTPError, ValueError) as exc:
                     rep.errors.append(f"{lg.name} {d}: {exc}")
                     continue
