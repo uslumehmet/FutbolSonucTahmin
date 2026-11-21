@@ -12,10 +12,10 @@ from app.betting.settlement import wallet_stats
 from app.betting.stats import (
     LEAGUE_ACCURACY_KEY, calibration_rows, live_calibration, mode_stats, refresh_league_accuracy, singles_stats,
 )
-from app.config import api_key, get_settings, get_value, save_settings, set_value
+from app.config import TZ, api_key, get_settings, get_value, save_settings, set_value
 from app.data.api_football import ApiFootball, probe
 from app.data.ingest import competition_teams
-from app.data.teams import confirm_new_team, merge_team
+from app.data.teams import confirm_new_team, merge_team, promoted_teams, unmatch_team
 from app.model.predict import repredict
 from app.models import BacktestRun, Coupon, Match, Team, Wallet
 
@@ -75,13 +75,37 @@ def _unmatched(s):
     return out
 
 
-def _settings_ctx(s, probe_result=None):
+MANUAL_MATCHED_KEY = "manual_matched_teams"  # Ayarlar'dan elle eşleştirilen takımların id'leri
+
+
+def _matched(s, today) -> list[dict]:
+    """Eşleşmiş takımlar: lige bu sezon yeni çıkanlar ve Ayarlar'dan elle eşleştirilenler."""
+    from app.models import TeamAlias
+
+    rows: dict[int, dict] = {}
+    for comp, team in promoted_teams(s, today):
+        rows[team.id] = {"team": team, "competition": comp, "manual": False}
+    for tid in get_value(s, MANUAL_MATCHED_KEY, []) or []:
+        team = s.get(Team, tid)
+        if team is None or team.is_temp:
+            continue
+        m = s.query(Match).filter((Match.home_team_id == tid) | (Match.away_team_id == tid)).first()
+        row = rows.setdefault(tid, {"team": team, "competition": m.competition if m else None})
+        row["manual"] = True
+    for row in rows.values():
+        t = row["team"]
+        row["has_api"] = t.api_id is not None or s.query(TeamAlias).filter_by(team_id=t.id, source="api").first() is not None
+    return sorted(rows.values(), key=lambda r: ((r["competition"].name if r["competition"] else ""), r["team"].name))
+
+
+def _settings_ctx(s, probe_result=None, today=None):
     api = ApiFootball(s, api_key(s) or "-", daily_limit=get_settings(s).api_daily_limit)
     key = api_key(s)
     return {"nav": "ayarlar", "s": get_settings(s), "key_hint": (key[:4] + "…" + key[-2:]) if key else None,
             "used": api.used_today(), "limit": api.daily_limit, "month_mb": api.month_bytes() / 1_048_576,
             "last_update": get_value(s, "last_update"), "last_settle": get_value(s, "last_settle"),
             "last_autoplay": get_value(s, "last_autoplay"), "unmatched": _unmatched(s), "probe": probe_result,
+            "matched": _matched(s, today) if today else [],
             "system_wallets": s.query(Wallet).filter(Wallet.owner != "user").order_by(Wallet.owner, Wallet.id).all(),
             "pick_range": _pick_range(s)}
 
@@ -101,7 +125,8 @@ def _pick_range(s) -> dict:
 @router.get("/ayarlar", response_class=HTMLResponse)
 def settings_page(request: Request):
     with request.app.state.sf() as s:
-        return request.app.state.render(request, "ayarlar.html", _settings_ctx(s))
+        return request.app.state.render(request, "ayarlar.html",
+                                        _settings_ctx(s, today=request.app.state.clock().astimezone(TZ).date()))
 
 
 FIELDS = {"safe_min_odds": float, "value_min_prob": float, "value_min_edge": float, "odds_adjust_pct": float,
@@ -149,7 +174,8 @@ def settings_probe(request: Request):
             return _go("/ayarlar", hata="Önce API anahtarını girin.")
         api = ApiFootball(s, key, daily_limit=get_settings(s).api_daily_limit)
         result = probe(api, request.app.state.clock().date())
-        return request.app.state.render(request, "ayarlar.html", _settings_ctx(s, result))
+        return request.app.state.render(request, "ayarlar.html",
+                                        _settings_ctx(s, result, request.app.state.clock().astimezone(TZ).date()))
 
 
 @router.post("/ayarlar/eslestir")
@@ -162,9 +188,26 @@ def settings_merge(request: Request, temp_id: int = Form(...), hedef: str = Form
         else:
             team_id = int(hedef)
             merge_team(s, temp_id, team_id)
+        manual = [t for t in (get_value(s, MANUAL_MATCHED_KEY, []) or []) if t != team_id]
+        set_value(s, MANUAL_MATCHED_KEY, manual + [team_id])  # "Eşleşmiş takımlar"da görünsün, geri alınabilsin
         soon = (s.query(Match).filter(((Match.home_team_id == team_id) | (Match.away_team_id == team_id)),
                                       Match.status == "scheduled", Match.unmatched.is_(False),
                                       Match.kickoff_utc >= now, Match.kickoff_utc <= now + timedelta(days=3)).all())
         for m in soon:
             repredict(s, m.id, now)
     return _go("/ayarlar", mesaj="Takım eşleştirildi.")
+
+
+@router.post("/ayarlar/eslestirme-kaldir")
+def settings_unmatch(request: Request, team_id: int = Form(...)):
+    """Takımın API eşleştirmesini kaldırır; takım "Eşleşmeyen takımlar"a "Eşleştir" düğmesiyle döner."""
+    with request.app.state.sf() as s:
+        team = s.get(Team, team_id)
+        if team is None:
+            return _go("/ayarlar", hata="Takım bulunamadı.")
+        name = team.name
+        if unmatch_team(s, team_id) is None:
+            return _go("/ayarlar", hata=f"{name} için API eşleştirmesi yok; kaldırılacak bir şey bulunmadı.")
+        set_value(s, MANUAL_MATCHED_KEY, [t for t in (get_value(s, MANUAL_MATCHED_KEY, []) or []) if t != team_id])
+    return _go("/ayarlar", mesaj=f"{name} eşleştirmesi kaldırıldı. Takım \"Eşleşmeyen takımlar\" listesinde; "
+                                 "doğru takımı seçip yeniden eşleştirebilirsiniz.")

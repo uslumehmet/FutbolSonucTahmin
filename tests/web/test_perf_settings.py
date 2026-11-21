@@ -96,3 +96,53 @@ def test_settings_market_toggle(client, session_factory):
     client.post("/ayarlar", data={"use_market_sent": "1", "use_market": "1"}, follow_redirects=True)
     with session_factory() as s:
         assert get_settings(s).use_market is True
+
+
+def _promoted_with_api(session_factory, match_id):
+    """Bu sezon lige yeni çıkan, API adı ve API maçı olan bir takım."""
+    from app.data.teams import add_alias, get_or_create_team
+
+    with session_factory() as s:
+        m = s.get(Match, match_id)
+        new = get_or_create_team(s, "of", "Yeni Çıkan SK", "club")
+        add_alias(s, new.id, "api", "Yeni Cikan")
+        new.api_id = 4242
+        m.home_team_id, m.api_fixture_id = new.id, 99001
+        s.commit()
+        return new.id
+
+
+def test_settings_lists_matched_and_unmatch_returns_team(client_seeded, session_factory):
+    import re
+
+    new_id = _promoted_with_api(session_factory, client_seeded.match_ids[0])
+    html = client_seeded.get("/ayarlar").text
+    matched = html.split("Eşleşmiş takımlar", 1)[1]
+    assert "Yeni Çıkan SK" in matched and 'action="/ayarlar/eslestirme-kaldir"' in matched
+    r = client_seeded.post("/ayarlar/eslestirme-kaldir", data={"team_id": new_id}, follow_redirects=True)
+    assert "eşleştirmesi kaldırıldı" in r.text
+    unmatched = r.text.split('id="eslestirme"', 1)[1].split("Eşleşmiş takımlar", 1)[0]
+    assert "Yeni Çıkan SK" in unmatched and "Eşleştir</button>" in unmatched
+    temp_id = int(re.search(r'name="temp_id" value="(\d+)"', unmatched).group(1))
+    client_seeded.post("/ayarlar/eslestir", data={"temp_id": temp_id, "hedef": str(new_id)}, follow_redirects=True)
+    with session_factory() as s:
+        m = s.get(Match, client_seeded.match_ids[0])
+        assert m.home_team_id == new_id and m.unmatched is False and s.get(Team, new_id).api_id == 4242
+
+
+def test_manual_match_is_listed(client_seeded, session_factory):
+    mid = client_seeded.match_ids[0]
+    with session_factory() as s:
+        m = s.get(Match, mid)
+        canon = m.away_team_id
+        canon_name = s.get(Team, canon).name
+        temp = Team(name="Takim Gecici", kind="club", is_temp=True, api_id=5151)
+        s.add(temp)
+        s.commit()
+        m.away_team_id, m.unmatched, m.api_fixture_id = temp.id, True, 99002
+        s.commit()
+        temp_id = temp.id
+    assert canon_name not in client_seeded.get("/ayarlar").text.split("Eşleşmiş takımlar", 1)[1]
+    client_seeded.post("/ayarlar/eslestir", data={"temp_id": temp_id, "hedef": str(canon)}, follow_redirects=True)
+    matched = client_seeded.get("/ayarlar").text.split("Eşleşmiş takımlar", 1)[1]
+    assert canon_name in matched and "elle eşleştirildi" in matched

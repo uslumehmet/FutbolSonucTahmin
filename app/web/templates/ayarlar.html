@@ -109,6 +109,18 @@
   </form>
   {% endfor %}
   {% else %}<p class="soft">Eşleşmeyen takım yok.</p>{% endif %}
+
+  <h3 style="margin-top:1.25rem">Eşleşmiş takımlar</h3>
+  <p class="soft"><small>Lige bu sezon yeni çıkan takımlar ve buradan elle eşleştirdikleriniz. Eşleştirmeyi kaldırırsanız takım yukarıdaki listeye döner; doğru takımı seçip yeniden eşleştirebilirsiniz.</small></p>
+  {% for r in matched %}
+  <form class="inline-form" method="post" action="/ayarlar/eslestirme-kaldir"
+        data-confirm="{{ r.team.name }} takımının API eşleştirmesi kaldırılacak. Yeniden eşleştirene kadar maçları tahmin edilmez ve kupona girmez. Emin misiniz?">
+    <input type="hidden" name="team_id" value="{{ r.team.id }}">
+    <span><b>{{ r.team.name }}</b> <small class="soft">({% if r.competition %}{{ r.competition.name }}, {% endif %}{{ 'elle eşleştirildi' if r.manual else 'lige yeni çıktı' }})</small></span>
+    {% if r.has_api %}<button class="btn small light" type="submit">Eşleştirmeyi kaldır</button>
+    {% else %}<small class="soft">API'den henüz maç gelmedi</small>{% endif %}
+  </form>
+  {% else %}<p class="soft">Lige yeni çıkan ya da elle eşleştirilen takım yok.</p>{% endfor %}
 </section>
 
 <section class="panel">
