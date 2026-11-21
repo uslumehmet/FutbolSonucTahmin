@@ -4,7 +4,7 @@
   <h3>{% if idx == 0 %}En iyi kupon{% else %}Alternatif {{ idx }}{% endif %} <small class="soft">{{ 'Güvenli' if c.mode == 'safe' else 'Değerli' }}, hedef {{ '%g'|format(c.target_odds) }}{% if c.min_prob %}, en az {{ c.min_prob|pct }}{% endif %}</small></h3>
   {% for p in c.picks %}{% set home, away = p.match.home_team.name, p.match.away_team.name %}
   {% set opts = (options or {}).get(p.id) if c.status == 'draft' else none %}
-  <div class="line">
+  <div class="line{% if opts %} edit{% endif %}">
     <span>{{ home }} – {{ away }}<br><small class="soft">{{ p.match.kickoff_utc|local_dt }}</small></span>
     {% if opts %}
     <form class="line-change" method="post" action="/kupon/{{ c.id }}/degistir/{{ p.id }}"
@@ -16,7 +16,6 @@
         </optgroup>{% endfor %}
       </select>
       <button class="btn small" type="submit">Değiştir</button>
-      <small class="soft">Tutma ihtimali {{ p.prob|pct }}</small>
     </form>
     {% else %}
     <span>{{ market_html(p.market, home, away) }}<br><small class="soft">{{ p.prob|pct }}</small></span>

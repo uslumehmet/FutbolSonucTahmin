@@ -109,7 +109,8 @@
   });
 })();
 
-// Koyu / açık tema: düğmeye basınca renkler yumuşak bir geçişle değişir; seçim tarayıcıda hatırlanır.
+// Koyu / açık tema: düğmeye basınca anında değişir (geçiş animasyonu yok: uzun sayfalarda takılıyordu);
+// seçim tarayıcıda hatırlanır.
 (function () {
   const root = document.documentElement;
   const btn = document.querySelector('.theme-toggle');
@@ -123,13 +124,10 @@
   if (!btn) return;
   btn.addEventListener('click', () => {
     const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    root.classList.add('theme-anim');
     root.setAttribute('data-theme', next);
     try { localStorage.setItem('tema', next); } catch (e) {}
     label();
     document.dispatchEvent(new CustomEvent('temadegisti', {detail: next}));
-    clearTimeout(btn._t);
-    btn._t = setTimeout(() => root.classList.remove('theme-anim'), 500);
   });
 })();
 

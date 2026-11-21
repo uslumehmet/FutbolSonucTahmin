@@ -163,21 +163,14 @@
     return last < s.start ? css('--bad') : css('--accent');
   }
   function fill(color) {
-    return ctx => {
-      const area = ctx.chart.chartArea;
-      if (!area) return 'transparent';
-      const g = ctx.chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
-      g.addColorStop(0, color + '55');
-      g.addColorStop(1, color + '00');
-      return g;
-    };
+    return color + '1f';  // düz, hafif dolgu (renk geçişi yok)
   }
   function datasets(s) {
     const c = lineColor(s);
     const first = s.data.length ? s.data[0].x : 0, last = s.data.length ? s.data[s.data.length - 1].x : 0;
     return [
       {label: s.label, data: s.data, borderColor: c, backgroundColor: fill(c), fill: 'start', borderWidth: 2.5,
-       tension: 0.35, cubicInterpolationMode: 'monotone', pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: c},
+       tension: 0, cubicInterpolationMode: 'default', pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: c},
       {label: 'Başlangıç', data: [{x: first, y: s.start}, {x: last, y: s.start}], borderColor: css('--ink-soft'),
        borderDash: [5, 5], borderWidth: 1, pointRadius: 0, fill: false}
     ];
@@ -191,7 +184,7 @@
       type: 'line', data: {datasets: datasets(s)},
       options: {
         responsive: true, maintainAspectRatio: false, parsing: false,
-        animation: {duration: 700, easing: 'easeOutQuart'},
+        animation: false,
         interaction: {mode: 'index', intersect: false},
         scales: {
           x: {type: 'linear', ...bounds(s), grid: {display: false}, border: {display: false},
@@ -226,7 +219,7 @@
   try { saved = localStorage.getItem('kasa'); } catch (e) {}
   select(saved && byId[saved] ? saved : tabs[0].dataset.wallet, false);
   // Tema değişince grafik yeni renklerle yeniden çizilir
-  document.addEventListener('temadegisti', () => setTimeout(() => { chart.destroy(); chart = null; select(current, false); }, 460));
+  document.addEventListener('temadegisti', () => { chart.destroy(); chart = null; select(current, false); });
 })();
 </script>
 {% endblock %}
