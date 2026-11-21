@@ -56,7 +56,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
         run: |
-          if [ -z "$DATABASE_URL" ]; then echo "DATABASE_URL secret'ı eksik (README: İnternete açma)"; exit 1; fi
+          if [ -z "$DATABASE_URL" ]; then echo "DATABASE_URL secret'ı eksik (KURULUM.md: İnternete açma)"; exit 1; fi
           python -m app.cli catch-up
 
       # Public depolarda GitHub, 60 gün commit olmazsa zamanlanmış iş akışlarını kapatır.

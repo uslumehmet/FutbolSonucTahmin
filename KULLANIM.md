@@ -1,13 +1,13 @@
 # FutbolSonuçTahmin — Kullanım
 
-Kurulum ve ücretsiz API anahtarı için önce [README.md](README.md) dosyasına bakın.
+Kurulum ve ücretsiz API anahtarı için önce [README.md](README.md), ayrıntılar için [KURULUM.md](KURULUM.md) dosyasına bakın.
 
 ## Başlatma
 Sunucu **pencere açmadan arka planda** çalışır.
 - Siteyi açmak için: `baslat.bat` (sistem kapalıysa önce başlatır, sonra tarayıcıda http://localhost:8765 açar) ya da tarayıcıda doğrudan http://localhost:8765
 - Durdurmak için: `durdur.bat` (8765 portunu dinleyen programı kapatır; o portu başka bir program kullanıyorsa onu da kapatır)
 - Bilgisayar açılınca kendiliğinden başlasın isterseniz: Win+R → `shell:startup` → açılan klasöre `arka_plan.vbs` dosyasının kısayolunu koyun. Kaldırmak için o kısayolu silin.
-- Telefondan, her yerden ve bilgisayar kapalıyken açmak için siteyi internete açın: README'deki "İnternete açma" bölümü (Render + Neon + GitHub Actions, şifreli giriş).
+- Telefondan, her yerden ve bilgisayar kapalıyken açmak için siteyi internete açın: KURULUM.md'deki "İnternete açma" bölümü (Render + Neon + GitHub Actions, şifreli giriş).
 - Sadece aynı Wi-Fi'de kısa süre için `baslat_ag.bat` (şifre yok; pencere kapanınca durur).
 - Sunucu kayıtları: `data\sunucu.log`
 
