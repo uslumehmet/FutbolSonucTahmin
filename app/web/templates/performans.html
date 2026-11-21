@@ -84,18 +84,21 @@
   <h2>Lig lig doğruluk</h2>
   <p class="soft"><small>Geriye dönük test: her maç, oynandığı güne kadarki veriyle tahmin edildi ve gerçek sonuçla karşılaştırıldı.
     {{ la.seasons[0] }}-{{ (la.seasons[0] + 1) % 100 }} sezonundan bu sezona kadar. Bu tablo kuponlardan değil modelin tahminlerinden hesaplanır.</small></p>
-  <div class="table-wrap"><table>
+  {# telefonda her lig bir kart (table.stack): üstte lig adı, altında etiketli değerler #}
+  {% macro lrow(name, a, cls='') %}
+    <tr{% if cls %} class="{{ cls }}"{% endif %}><td class="wide">{{ name }}</td><td class="num" data-label="Maç">{{ a.n }}</td>
+      <td class="num" data-label="Maç sonucu doğru">{{ rate(a.ok, a.n) }}</td>
+      <td class="num" data-label="2.5 Alt/Üst doğru">{{ rate(a.ou_ok, a.ou_n) }}</td>
+      <td class="num" data-label="Güçlü favori kazandı">{{ rate(a.fav_ok, a.fav_n) }}</td>
+      <td class="num" data-label="Bu sezon maç sonucu">{{ rate(a.cur_ok, a.cur_n) }}</td></tr>
+  {% endmacro %}
+  <div class="table-wrap"><table class="stack">
     <tr><th>Lig</th><th class="num">Maç</th><th class="num">Maç sonucu doğru</th><th class="num">Toplam gol 2.5 Alt/Üst doğru</th>
       <th class="num" data-tip="Model bir takımın kazanmasına en az %60 ihtimal verdiğinde o takım kaç kez kazandı?">Güçlü favori kazandı</th>
       <th class="num">Bu sezon maç sonucu</th></tr>
-    {% for a in la.leagues %}
-    <tr><td>{{ a.name }}</td><td class="num">{{ a.n }}</td><td class="num">{{ rate(a.ok, a.n) }}</td>
-      <td class="num">{{ rate(a.ou_ok, a.ou_n) }}</td><td class="num">{{ rate(a.fav_ok, a.fav_n) }}</td>
-      <td class="num">{{ rate(a.cur_ok, a.cur_n) }}</td></tr>
-    {% endfor %}
+    {% for a in la.leagues %}{{ lrow(a.name, a) }}{% endfor %}
     {% set t = la.total %}
-    <tr class="total-row"><td><b>Hepsi</b></td><td class="num">{{ t.n }}</td><td class="num">{{ rate(t.ok, t.n) }}</td>
-      <td class="num">{{ rate(t.ou_ok, t.ou_n) }}</td><td class="num">{{ rate(t.fav_ok, t.fav_n) }}</td><td class="num">{{ rate(t.cur_ok, t.cur_n) }}</td></tr>
+    {{ lrow('Hepsi', t, 'total-row') }}
   </table></div>
   <p class="soft"><small>Karşılaştırma için: maç sonucunda üç seçenek var, rastgele tahmin %33 tutar; her maçta "ev sahibi kazanır" demek bu maçlarda {{ (t.home / t.n)|pct }} tuttu.
     Bu sezonun sayıları az maça dayanır, sezon başında belirsizlik yüksektir. Tablo her hafta modeller yeniden eğitilince yenilenir{% if la.at %} (son: {{ la.at|local_iso }}){% endif %}.</small></p>
@@ -119,25 +122,28 @@
   <h3 style="margin-top:1.25rem">Geçmiş test</h3>
   {% if bt %}
   <p>{{ bt.seasons|join(', ') }} sezonları, {{ bt.n_matches }} maç. Her maç yalnızca o güne kadarki verilerle tahmin edildi.</p>
-  <div class="table-wrap"><table>
+  <div class="table-wrap"><table class="stack">
     <tr><th>Pazar</th><th class="num">İsabet</th><th class="num">Log-loss (model)</th><th class="num">Log-loss (basit tahmin)</th><th class="num">Kalibrasyon hatası</th></tr>
     {% for g, v in bt.groups.items() %}
-    <tr><td>{{ group_labels.get(g, g) }}</td><td class="num">{{ v.accuracy|pct }}</td><td class="num">{{ '%.3f'|format(v.model_ll) }}</td>
-      <td class="num">{{ '%.3f'|format(v.base_ll) }}</td><td class="num">{{ v.ece|pct }}</td></tr>
+    <tr><td class="wide">{{ group_labels.get(g, g) }}</td><td class="num" data-label="İsabet">{{ v.accuracy|pct }}</td>
+      <td class="num" data-label="Log-loss (model)">{{ '%.3f'|format(v.model_ll) }}</td>
+      <td class="num" data-label="Log-loss (basit tahmin)">{{ '%.3f'|format(v.base_ll) }}</td>
+      <td class="num" data-label="Kalibrasyon hatası">{{ v.ece|pct }}</td></tr>
     {% endfor %}
   </table></div>
   <p class="soft"><small>Log-loss düşük olan daha iyidir. "Basit tahmin", her maça ligin ortalama ev/beraberlik/deplasman oranlarını veren tahmindir.</small></p>
   <h3>Model emin olduğunda ne oldu?</h3>
-  <div class="table-wrap"><table><tr><th>Modelin en olası seçimi</th><th class="num">Maç</th><th class="num">Ortalama söylenen</th><th class="num">Tuttu</th></tr>
-    {% for r in bt.confidence %}<tr><td>en az {{ r.min_prob|pct }}</td><td class="num">{{ r.n }}</td><td class="num">{{ r.avg_prob|pct }}</td><td class="num">{{ r.hit|pct }}</td></tr>{% endfor %}</table></div>
+  <div class="table-wrap"><table class="stack"><tr><th>Modelin en olası seçimi</th><th class="num">Maç</th><th class="num">Ortalama söylenen</th><th class="num">Tuttu</th></tr>
+    {% for r in bt.confidence %}<tr><td class="wide">Model en az {{ r.min_prob|pct }} dediğinde</td><td class="num" data-label="Maç">{{ r.n }}</td><td class="num" data-label="Ortalama söylenen">{{ r.avg_prob|pct }}</td><td class="num" data-label="Tuttu">{{ r.hit|pct }}</td></tr>{% endfor %}</table></div>
   <ul class="reasons" style="margin-top:.75rem">{% for n in bt.notes %}<li><small>{{ n }}</small></li>{% endfor %}</ul>
   {% else %}<p class="soft">Geçmiş test henüz çalıştırılmadı (<code>python -m app.cli backtest</code>).</p>{% endif %}
 
   <h3 style="margin-top:1.25rem">Makine öğrenmesi katmanı</h3>
-  <div class="table-wrap"><table><tr><th>Pazar</th><th>Durum</th><th class="num">Katman 1 log-loss</th><th class="num">Katman 2 log-loss</th></tr>
+  <div class="table-wrap"><table class="stack"><tr><th>Pazar</th><th>Durum</th><th class="num">Katman 1 log-loss</th><th class="num">Katman 2 log-loss</th></tr>
   {% for g, label in group_labels.items() %}{% set mt = l2_metrics.get(g, {}) %}
-    <tr><td>{{ label }}</td><td>{{ 'açık' if l2_active.get(g) else 'kapalı' }}</td>
-      <td class="num">{{ '%.4f'|format(mt.l1_ll) if mt.l1_ll is defined else '–' }}</td><td class="num">{{ '%.4f'|format(mt.l2_ll) if mt.l2_ll is defined else '–' }}</td></tr>
+    <tr><td class="wide">{{ label }}</td><td data-label="Durum">{{ 'açık' if l2_active.get(g) else 'kapalı' }}</td>
+      <td class="num" data-label="Katman 1 log-loss">{{ '%.4f'|format(mt.l1_ll) if mt.l1_ll is defined else '–' }}</td>
+      <td class="num" data-label="Katman 2 log-loss">{{ '%.4f'|format(mt.l2_ll) if mt.l2_ll is defined else '–' }}</td></tr>
   {% endfor %}</table></div>
   <p class="soft"><small>Katman 2 yalnızca testte tahmini iyileştirdiyse açık kalır; haftada bir yeniden eğitilir.</small></p>
 </details>

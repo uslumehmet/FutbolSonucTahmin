@@ -290,6 +290,7 @@ table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: .5rem .55rem; border-bottom: 1px solid var(--rule); vertical-align: middle; }
 th { font-weight: 600; color: var(--ink-soft); font-size: .88rem; }
 td.num, th.num { text-align: right; white-space: nowrap; }
+tr.total-row > td:first-child { font-weight: 700; }
 .pos { color: var(--good); font-weight: 600; }
 .neg { color: var(--ink-soft); }
 .loss { color: var(--bad); font-weight: 600; }  /* zarar: eksi net, eksi getiri */
@@ -468,7 +469,9 @@ details.panel > summary h2 { margin: 0; }
   /* tablolar: telefonda sıkı; başlıklar alt satıra geçebilir, yüzdenin yanındaki sayı alta iner */
   table { font-size: .92rem; }
   th, td { padding: .4rem .3rem; }
-  th, td { overflow-wrap: anywhere; }
+  /* uzun kelime gerekirse bölünür ama sütun harf genişliğine kadar daralmaz ("anywhere" lig adlarını harf harf alt alta yazıyordu) */
+  th, td { overflow-wrap: break-word; }
+  th.num { white-space: normal; }  /* "Tutma ihtimali", "Birim ROI" gibi başlıklar iki satıra geçebilir */
   td.num small { display: block; }
   .panel { padding: .9rem .75rem; }
   /* Kasalar: her kasa alt alta bir kart */
@@ -479,6 +482,7 @@ details.panel > summary h2 { margin: 0; }
   table.stack td { border: 0; padding: 0; text-align: left; }
   table.stack td[data-label]::before { content: attr(data-label); display: block; font-size: .8rem; color: var(--ink-soft); }
   table.stack td.wide { grid-column: 1 / -1; }
+  table.stack tr > td.wide:first-child { font-weight: 600; }
 }
 /* çok dar telefonlar (320–380 px): giriş kutuları ve tablolar ekrana sığsın */
 select, input[type=text], input[type=number], input[type=password] { max-width: 100%; }
