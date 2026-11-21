@@ -8,7 +8,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.betting.coupon import build_coupons, save_coupon
-from app.betting.selection import eligible, match_candidates
+from app.betting.selection import candidates_for_match, eligible, match_candidates, sectioned
 from app.betting.settlement import wallet_stats
 from app.betting.wallets import OWNER_LABELS, WalletError, check_min_prob, create_wallet, delete_wallet, place_bet, reset_wallet
 from app.config import TZ, get_settings
@@ -130,7 +130,8 @@ def coupon_create(request: Request, hedef: str = Form("3"), mod: str = Form("saf
                           if mode == "value" else
                           "Hedef orana ulaşılamadı; hedefi değiştirin ya da daha uzun bir aralık seçin.")
         wallets = s.query(Wallet).filter_by(owner="user", busted=False).order_by(Wallet.id).all()
-        ctx = {"coupons": coupons, "reason": reason, "wallets": wallets, "mode": mode}
+        ctx = {"coupons": coupons, "reason": reason, "wallets": wallets, "mode": mode,
+               "options": _pick_options(s, coupons, settings)}
         if request.headers.get("HX-Request"):
             return request.app.state.templates.TemplateResponse(request, "partials/_coupons.html", ctx)
         return _render(request, "kupon.html", {"nav": "kupon", "targets": TARGETS, "day_labels": DAY_LABELS,
@@ -138,35 +139,87 @@ def coupon_create(request: Request, hedef: str = Form("3"), mod: str = Form("saf
                                                "result": ctx})
 
 
+def _pick_options(s, coupons, settings) -> dict:
+    """Taslak kuponlardaki her seçim için değiştirilebilecek bahisler: {pick_id: [(bölüm, [Candidate])]}.
+
+    Seçili bahsin oranı sonradan kaybolduysa o da listede kalır (liste başka bir bahsi seçili göstermesin).
+    """
+    from app.betting.selection import Candidate
+
+    out, by_match = {}, {}
+    for c in coupons:
+        if c.status != "draft":
+            continue
+        for p in c.picks:
+            if p.match_id not in by_match:
+                by_match[p.match_id] = candidates_for_match(s, p.match, settings)
+            cands = by_match[p.match_id]
+            if cands and all(x.market != p.market for x in cands):
+                cands = [Candidate(p.match_id, p.market, p.odds, p.prob), *cands]
+            if cands:
+                out[p.id] = sectioned(cands)
+    return out
+
+
+def _recompute(coupon) -> None:
+    import math
+
+    coupon.total_odds = round(math.prod(p.odds for p in coupon.picks), 4)
+    coupon.prob = math.prod(p.prob for p in coupon.picks)
+
+
+def _draft_pick(s, coupon_id: int, pick_id: int):
+    from app.models import CouponPick
+
+    coupon = s.get(Coupon, coupon_id)
+    pick = s.get(CouponPick, pick_id)
+    if coupon is None or pick is None or pick.coupon_id != coupon.id:
+        raise HTTPException(404)
+    return coupon, pick
+
+
+def _slip_response(request: Request, s, coupon, idx: int):
+    """Değişen kupon kartı: HTMX ise sadece kart, değilse bütün Kupon oluştur sayfası."""
+    wallets = s.query(Wallet).filter_by(owner="user", busted=False).order_by(Wallet.id).all()
+    options = _pick_options(s, [coupon], get_settings(s))
+    if request.headers.get("HX-Request"):
+        return request.app.state.templates.TemplateResponse(
+            request, "partials/_slip.html", {"c": coupon, "idx": idx, "wallets": wallets, "options": options})
+    result = {"coupons": [coupon], "reason": None, "wallets": wallets, "mode": coupon.mode, "options": options}
+    return _render(request, "kupon.html", {"nav": "kupon", "targets": TARGETS, "day_labels": DAY_LABELS,
+                                           "min_probs": MIN_PROBS,
+                                           "leagues": _available_leagues(s, request.app.state.clock()),
+                                           "result": result})
+
+
 @router.post("/kupon/{coupon_id}/cikar/{pick_id}", response_class=HTMLResponse)
 def coupon_remove_pick(request: Request, coupon_id: int, pick_id: int, idx: int = Form(0)):
     """Henüz oynanmamış (taslak) kupondan bir maçı çıkarır; toplam oran ve ihtimal yeniden hesaplanır."""
-    import math
-
-    from app.models import CouponPick
-
     with request.app.state.sf() as s:
-        coupon = s.get(Coupon, coupon_id)
-        pick = s.get(CouponPick, pick_id)
-        if coupon is None or pick is None or pick.coupon_id != coupon.id:
-            raise HTTPException(404)
+        coupon, pick = _draft_pick(s, coupon_id, pick_id)
         if coupon.status != "draft":
             return _go("/kupon", hata="Oynanmış kupondan maç çıkarılamaz.")
         if len(coupon.picks) > 1:
             coupon.picks.remove(pick)
             s.delete(pick)
-            coupon.total_odds = round(math.prod(p.odds for p in coupon.picks), 4)
-            coupon.prob = math.prod(p.prob for p in coupon.picks)
+            _recompute(coupon)
             s.commit()
-        wallets = s.query(Wallet).filter_by(owner="user", busted=False).order_by(Wallet.id).all()
-        ctx = {"c": coupon, "idx": idx, "wallets": wallets}
-        if request.headers.get("HX-Request"):
-            return request.app.state.templates.TemplateResponse(request, "partials/_slip.html", ctx)
-        result = {"coupons": [coupon], "reason": None, "wallets": wallets, "mode": coupon.mode}
-        return _render(request, "kupon.html", {"nav": "kupon", "targets": TARGETS, "day_labels": DAY_LABELS,
-                                               "min_probs": MIN_PROBS,
-                                               "leagues": _available_leagues(s, request.app.state.clock()),
-                                               "result": result})
+        return _slip_response(request, s, coupon, idx)
+
+
+@router.post("/kupon/{coupon_id}/degistir/{pick_id}", response_class=HTMLResponse)
+def coupon_change_pick(request: Request, coupon_id: int, pick_id: int, bahis: str = Form(""), idx: int = Form(0)):
+    """Taslak kupondaki bir maçın bahsini, o maçın oranı olan başka bir bahisle değiştirir."""
+    with request.app.state.sf() as s:
+        coupon, pick = _draft_pick(s, coupon_id, pick_id)
+        if coupon.status != "draft":
+            return _go("/kupon", hata="Oynanmış kupon değiştirilemez.")
+        cand = next((c for c in candidates_for_match(s, pick.match, get_settings(s)) if c.market == bahis), None)
+        if cand is not None and cand.market != pick.market:  # oranı olmayan bahis seçilemez
+            pick.market, pick.odds, pick.prob = cand.market, cand.odds, cand.prob
+            _recompute(coupon)
+            s.commit()
+        return _slip_response(request, s, coupon, idx)
 
 
 @router.post("/kupon/{coupon_id}/oyna")

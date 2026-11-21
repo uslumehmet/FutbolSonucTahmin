@@ -45,5 +45,5 @@
     <b>En düşük tutma ihtimali</b>: kupona sadece tutma ihtimali en az bu kadar olan seçimler girer (ör. %75); sınır yükseldikçe oranlar düşer, hedefe ulaşmak için daha çok maç gerekir. Kurulan kupondan istemediğiniz maçı × ile çıkarabilirsiniz.</small></p>
   <button class="btn" type="submit">Kupon oluştur</button>
 </form>
-<div id="sonuc">{% if result %}{% with coupons=result.coupons, reason=result.reason, wallets=result.wallets, mode=result.mode %}{% include "partials/_coupons.html" %}{% endwith %}{% endif %}</div>
+<div id="sonuc">{% if result %}{% with coupons=result.coupons, reason=result.reason, wallets=result.wallets, mode=result.mode, options=result.options %}{% include "partials/_coupons.html" %}{% endwith %}{% endif %}</div>
 {% endblock %}

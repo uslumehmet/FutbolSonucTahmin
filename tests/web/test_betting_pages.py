@@ -280,3 +280,60 @@ def test_coupon_min_probability_filter(client_seeded, session_factory):
             assert c.min_prob == 0.6 and all(p.prob >= 0.6 for p in c.picks)
     r = client_seeded.post("/kupon/olustur", data={"hedef": "3", "mod": "safe", "gun": "3gun", "en_az": "99"})
     assert "en az %99" in r.text and not re.search(r'action="/kupon/\d+/oyna"', r.text)
+
+
+def _draft_pick(client, session_factory):
+    """Taslak kupon kurar; (kupon id, seçim id, kartın html'i) döndürür."""
+    _make_value_odds(session_factory)
+    r = client.post("/kupon/olustur", data={"hedef": "5", "mod": "safe", "gun": "3gun"})
+    pairs = re.findall(r'action="/kupon/(\d+)/degistir/(\d+)"', r.text)
+    assert pairs, "taslak kuponda bahis değiştirme formu olmalı"
+    cid, pid = (int(x) for x in pairs[0])
+    return cid, pid, r.text
+
+
+def test_change_pick_market_in_draft(client_seeded, session_factory):
+    import math
+
+    from app.betting.selection import candidates_for_match
+    from app.config import get_settings
+    from app.models import CouponPick
+
+    cid, pid, html = _draft_pick(client_seeded, session_factory)
+    assert '<select name="bahis"' in html and '<optgroup label="' in html
+    with session_factory() as s:
+        pick = s.get(CouponPick, pid)
+        other = next(c for c in candidates_for_match(s, pick.match, get_settings(s)) if c.market != pick.market)
+    r = client_seeded.post(f"/kupon/{cid}/degistir/{pid}", data={"bahis": other.market, "idx": "0"},
+                           headers={"HX-Request": "true"})
+    assert r.status_code == 200 and f'id="kupon-{cid}"' in r.text
+    assert f'value="{other.market}" selected' in r.text
+    with session_factory() as s:
+        pick, c = s.get(CouponPick, pid), s.get(Coupon, cid)
+        assert (pick.market, pick.odds, pick.prob) == (other.market, other.odds, other.prob)
+        assert c.total_odds == round(math.prod(p.odds for p in c.picks), 4)
+        assert c.prob == math.prod(p.prob for p in c.picks)
+
+
+def test_change_pick_rejects_unknown_market_and_played_coupon(client_seeded, session_factory):
+    from app.models import CouponPick
+
+    cid, pid, _ = _draft_pick(client_seeded, session_factory)
+    with session_factory() as s:
+        before = s.get(CouponPick, pid).market
+    r = client_seeded.post(f"/kupon/{cid}/degistir/{pid}", data={"bahis": "YOK", "idx": "0"},
+                           headers={"HX-Request": "true"})
+    assert r.status_code == 200
+    with session_factory() as s:
+        assert s.get(CouponPick, pid).market == before
+    r = client_seeded.post(f"/kupon/{cid + 999}/degistir/{pid}", data={"bahis": before, "idx": "0"})
+    assert r.status_code == 404
+    w = _user_wallet(session_factory)
+    client_seeded.post(f"/kupon/{cid}/oyna", data={"wallet_id": w.id, "tutar": "10"})
+    with session_factory() as s:
+        pick = s.get(CouponPick, pid)
+        other = "MS2" if pick.market != "MS2" else "MS1"
+    r = client_seeded.post(f"/kupon/{cid}/degistir/{pid}", data={"bahis": other, "idx": "0"}, follow_redirects=True)
+    assert "Oynanmış kupon değiştirilemez" in r.text
+    with session_factory() as s:
+        assert s.get(CouponPick, pid).market == before

@@ -1,10 +1,26 @@
-{# Kupon oluştur'daki tek kupon. Değişkenler: c (Coupon), idx (0 = en iyi kupon), wallets. #}
+{# Kupon oluştur'daki tek kupon. Değişkenler: c (Coupon), idx (0 = en iyi kupon), wallets,
+   options ({pick_id: [(bölüm, [Candidate])]}: taslakta bahsi değiştirme listesi). #}
 <article class="slip {{ c.mode }}" id="kupon-{{ c.id }}">
   <h3>{% if idx == 0 %}En iyi kupon{% else %}Alternatif {{ idx }}{% endif %} <small class="soft">{{ 'Güvenli' if c.mode == 'safe' else 'Değerli' }}, hedef {{ '%g'|format(c.target_odds) }}{% if c.min_prob %}, en az {{ c.min_prob|pct }}{% endif %}</small></h3>
-  {% for p in c.picks %}
+  {% for p in c.picks %}{% set home, away = p.match.home_team.name, p.match.away_team.name %}
+  {% set opts = (options or {}).get(p.id) if c.status == 'draft' else none %}
   <div class="line">
-    <span>{{ p.match.home_team.name }} – {{ p.match.away_team.name }}<br><small class="soft">{{ p.match.kickoff_utc|local_dt }}</small></span>
-    <span>{{ market_html(p.market, p.match.home_team.name, p.match.away_team.name) }}<br><small class="soft">{{ p.prob|pct }}</small></span>
+    <span>{{ home }} – {{ away }}<br><small class="soft">{{ p.match.kickoff_utc|local_dt }}</small></span>
+    {% if opts %}
+    <form class="line-change" method="post" action="/kupon/{{ c.id }}/degistir/{{ p.id }}"
+          hx-post="/kupon/{{ c.id }}/degistir/{{ p.id }}" hx-trigger="change" hx-target="#kupon-{{ c.id }}" hx-swap="outerHTML">
+      <input type="hidden" name="idx" value="{{ idx }}">
+      <select name="bahis" aria-label="{{ home }} – {{ away }} maçının bahsi (yanında tutma ihtimali ve oran)">
+        {% for title, items in opts %}<optgroup label="{{ title }}">
+          {% for o in items %}<option value="{{ o.market }}"{% if o.market == p.market %} selected{% endif %}>{{ market_label(o.market, home, away) }} — {{ o.prob|pct }} · {{ o.odds|odds }}</option>{% endfor %}
+        </optgroup>{% endfor %}
+      </select>
+      <button class="btn small" type="submit">Değiştir</button>
+      <small class="soft">Tutma ihtimali {{ p.prob|pct }}</small>
+    </form>
+    {% else %}
+    <span>{{ market_html(p.market, home, away) }}<br><small class="soft">{{ p.prob|pct }}</small></span>
+    {% endif %}
     <span class="num">{{ p.odds|odds }}</span>
     {% if c.status == 'draft' and c.picks|length > 1 %}
     <form class="line-remove" method="post" action="/kupon/{{ c.id }}/cikar/{{ p.id }}"
