@@ -49,33 +49,33 @@
 /* ---------- renkler: koyu tema (koyu gri; mavi-siyah değil) ---------- */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --paper: #1f1f1f;
-  --sheet: #2a2a2a;
+  --paper: #171717;
+  --sheet: #222222;
   --ink: #e6e6e6;
   --ink-soft: #a3a3a3;
-  --rule: #3c3c3c;
+  --rule: #353535;
   --accent: #7ea7c6;
   --accent-strong: #a9c4d9;
-  --accent-soft: #2f363c;
+  --accent-soft: #2a3137;
   --home: #6f9cc0;
-  --home-ink: #1f1f1f;
+  --home-ink: #171717;
   --draw: #555555;
   --draw-ink: #e6e6e6;
   --away: #cf9f45;
-  --away-ink: #1f1f1f;
+  --away-ink: #171717;
   --good: #6cbf8a;
   --bad: #ef7a6f;
   --focus: #a9c4d9;
-  --header-bg: #2a2a2a;
+  --header-bg: #222222;
   --btn-bg: #e6e6e6;
-  --btn-ink: #1f1f1f;
-  --hover: #333333;
-  --chip: #363636;
-  --section: #262626;
+  --btn-ink: #171717;
+  --hover: #2b2b2b;
+  --chip: #2f2f2f;
+  --section: #1d1d1d;
   --notice: #38321f;
   --notice-err: #3d2725;
   --notice-ok: #25362b;
-  --safe-bg: #2f363c;
+  --safe-bg: #2a3137;
   --safe-bd: #4c6273;
   --value-bg: #3a3222;
   --value-bd: #6e5a2e;
@@ -83,10 +83,14 @@
   --lost-bg: #3d2725;
   --void-bg: #383222;
   --void: #d9bb7a;
-  --tip-bg: #333333;
+  --tip-bg: #2b2b2b;
   --shadow: rgba(0, 0, 0, .3);
   --shadow-lg: rgba(0, 0, 0, .5);
 }
+
+/* Tema değişimi: sayfanın tamamı tek seferde kısa bir solmayla değişir (View Transitions).
+   Her öğeye ayrı renk geçişi vermek uzun sayfalarda takılıyordu; bu yöntem tek bir görüntüyü soldurur. */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .3s; }
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -204,15 +208,24 @@ details[open] > summary::before { transform: rotate(45deg); }
 
 /* ---------- filtreler ---------- */
 .toolbar { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; align-items: center; margin: 0 0 1.25rem; }
-.seg { display: inline-flex; gap: 0; padding: 0; border: 1px solid var(--rule); border-radius: var(--radius-s); background: var(--sheet); overflow: hidden; }
-.seg a, .seg button, .seg label { padding: .35rem .9rem; text-decoration: none; border: 0; background: none; border-radius: 0;
-  font: inherit; cursor: pointer; color: var(--ink-soft); }
-.seg > * + * { border-left: 1px solid var(--rule) !important; }
+.toolbar > * { min-width: 0; max-width: 100%; }
+/* seçenek grubu: bölmeler arasındaki 1 px boşluktan çizgi rengi görünür */
+.seg { display: inline-flex; gap: 1px; padding: 0; border: 1px solid var(--rule); border-radius: var(--radius-s);
+  background: var(--rule); overflow: hidden; max-width: 100%; }
+.seg a, .seg button, .seg label { padding: .35rem .9rem; text-decoration: none; border: 0; background: var(--sheet); border-radius: 0;
+  font: inherit; cursor: pointer; color: var(--ink-soft); text-align: center; }
 .seg a:hover { background: var(--hover); color: var(--ink); }
 .seg a[aria-current="true"], .seg input:checked + span { background: var(--btn-bg); color: var(--btn-ink); }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
 .seg label { padding: 0; }
 .seg label span { display: block; padding: .35rem .9rem; }
+.seg input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: -3px; }
+@media (max-width: 760px) {
+  /* telefonda tam genişlik, eşit bölmeler, tek satır (%60–%80 gibi uzun gruplar alta taşmasın) */
+  .toolbar > * { flex: 1 1 100%; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); width: 100%; }
+  .seg a, .seg label span { padding: .5rem .2rem; }
+}
 select, input[type=text], input[type=number], input[type=password] { font: inherit; padding: .42rem .6rem;
   border: 1px solid var(--rule); border-radius: var(--radius-s); background: var(--sheet); color: var(--ink); min-width: 0; }
 select:focus, input[type=text]:focus, input[type=number]:focus, input[type=password]:focus {
@@ -306,6 +319,7 @@ tr.section-row th { background: var(--section); color: var(--ink); font-family: 
 .reasons { margin: 0; padding-left: 1.1rem; }
 .reasons li { margin: .2rem 0; }
 .inline-form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: .75rem; }
+.inline-form > * { min-width: 0; max-width: 100%; }
 .btn { font: inherit; font-weight: 600; padding: .45rem 1rem; border-radius: var(--radius-s); border: 1px solid var(--btn-bg);
   background: var(--btn-bg); color: var(--btn-ink); cursor: pointer; text-decoration: none; display: inline-block; }
 .btn:hover { opacity: .88; }
@@ -406,13 +420,13 @@ tr.section-row th { background: var(--section); color: var(--ink); font-family: 
 /* ---------- performans: tek grafik + kasa seçici ---------- */
 .chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem 1rem; flex-wrap: wrap; }
 .chart-head h2 { margin: 0; }
-.wallet-tabs { display: flex; flex-wrap: wrap; gap: .5rem; padding: .85rem 0 .35rem; }
+.wallet-tabs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr)); gap: .5rem; padding: .85rem 0 .35rem; }
 .wtab { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: .1rem; text-align: left;
   font: inherit; color: var(--ink); background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-s);
-  padding: .5rem .8rem; cursor: pointer; min-width: 9.5rem; }
+  padding: .5rem .8rem; cursor: pointer; min-width: 0; }
 .wtab:hover { border-color: var(--ink-soft); }
 .wtab[aria-selected="true"] { background: var(--accent-soft); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
-.wtab-name { font-weight: 600; font-size: .9rem; white-space: nowrap; }
+.wtab-name { font-weight: 600; font-size: .9rem; overflow-wrap: break-word; text-wrap: balance; }
 .wtab-val { font-family: var(--head); font-weight: 600; font-size: 1.05rem; white-space: nowrap; }
 .wtab-val i { font-style: normal; font-size: .85rem; margin-left: .25rem; color: var(--ink-soft); }
 .wtab-val i.up { color: var(--good); }
@@ -450,7 +464,28 @@ details.panel > summary h2 { margin: 0; }
   .xg { font-size: 2rem; }
   .table-wrap { overflow-x: auto; }
   .chartbox { height: 260px; }
-  .wallet-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -1.1rem; padding: .85rem 1.1rem .35rem; }
+  .wallet-tabs { grid-template-columns: 1fr 1fr; }
+  /* tablolar: telefonda sıkı; başlıklar alt satıra geçebilir, yüzdenin yanındaki sayı alta iner */
+  table { font-size: .92rem; }
+  th, td { padding: .4rem .3rem; }
+  th, td { overflow-wrap: anywhere; }
+  td.num small { display: block; }
+  .panel { padding: .9rem .75rem; }
+  /* Kasalar: her kasa alt alta bir kart */
+  table.stack, table.stack tbody, table.stack td { display: block; }
+  table.stack tr:first-child { display: none; }
+  table.stack tr { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem 1rem; padding: .8rem 0; border-bottom: 1px solid var(--rule); }
+  table.stack tr:last-child { border-bottom: 0; }
+  table.stack td { border: 0; padding: 0; text-align: left; }
+  table.stack td[data-label]::before { content: attr(data-label); display: block; font-size: .8rem; color: var(--ink-soft); }
+  table.stack td.wide { grid-column: 1 / -1; }
+}
+/* çok dar telefonlar (320–380 px): giriş kutuları ve tablolar ekrana sığsın */
+select, input[type=text], input[type=number], input[type=password] { max-width: 100%; }
+@media (max-width: 380px) {
+  table { font-size: .86rem; }
+  th, td { padding: .35rem .2rem; }
+  .panel { padding: .8rem .6rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }

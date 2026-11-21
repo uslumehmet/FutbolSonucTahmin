@@ -6,29 +6,29 @@
 <p class="soft">Sistem kasaları her kupona, varsayılan olarak, güncel bakiyenin %3'ünü yatırır (1.000 ₺ kasada 30 ₺). Bu temkinli bir ayardır: kötü giden birkaç günde kasa batmaz. Daha yüksek tutar için kuralı aşağıdan değiştirebilirsiniz.</p>
 <p class="soft">Her kasa sanal parayla başlar. Sistem kasaları her gün kendi modunun kuponlarını kendi tutar kuralıyla oynar; aynı modun kasaları aynı kuponları oynar, sadece tutarları farklıdır.</p>
 <section class="panel">
-  <div class="table-wrap"><table>
+  <div class="table-wrap"><table class="stack">
     <tr><th>Kasa</th><th>Oynayan</th><th class="num">Başlangıç</th><th class="num">Bakiye</th><th class="num">Net</th><th class="num">ROI</th><th>Kural</th><th></th></tr>
     {% for w, st in rows %}
     <tr>
-      <td>
+      <td class="wide">
         <form class="rename" method="post" action="/kasalar/{{ w.id }}/ad">
           <input type="text" name="ad" value="{{ w.name }}" maxlength="60" required aria-label="Kasa adı" title="Adı değiştirmek için tıklayın">
           <button class="btn small" type="submit">Kaydet</button>
         </form>
         <small><a href="/kuponlarim?kasa={{ w.id }}">kuponları</a>{% if w.min_prob %} · en az %{{ (w.min_prob * 100)|round|int }} ihtimal{% endif %}{% if w.busted %} · <span class="wallet-busted">battı</span>{% endif %}</small>
       </td>
-      <td>{{ owner_labels[w.owner] }}</td>
-      <td class="num">{{ w.start_balance|tl }}</td>
-      <td class="num"><b>{{ w.balance|tl }}</b></td>
-      <td class="num {% if st.net > 0 %}pos{% elif st.net < 0 %}loss{% endif %}">{{ st.net|tl }}</td>
-      <td class="num {% if st.played and st.roi is not none %}{% if (st.roi * 100)|round > 0 %}pos{% elif (st.roi * 100)|round < 0 %}loss{% endif %}{% endif %}">{{ st.roi|signed_pct if st.played else '–' }}</td>
-      <td>{% if w.owner == 'user' %}<small>tutarı siz girersiniz</small>{% else %}
+      <td data-label="Oynayan">{{ owner_labels[w.owner] }}</td>
+      <td class="num" data-label="Başlangıç">{{ w.start_balance|tl }}</td>
+      <td class="num" data-label="Bakiye"><b>{{ w.balance|tl }}</b></td>
+      <td data-label="Net" class="num {% if st.net > 0 %}pos{% elif st.net < 0 %}loss{% endif %}">{{ st.net|tl }}</td>
+      <td data-label="ROI" class="num {% if st.played and st.roi is not none %}{% if (st.roi * 100)|round > 0 %}pos{% elif (st.roi * 100)|round < 0 %}loss{% endif %}{% endif %}">{{ st.roi|signed_pct if st.played else '–' }}</td>
+      <td class="wide" data-label="Tutar kuralı">{% if w.owner == 'user' %}<small>tutarı siz girersiniz</small>{% else %}
         <form class="inline-form" style="margin:0" method="post" action="/kasalar/{{ w.id }}/kural">
           <select name="kural" aria-label="Tutar kuralı"><option value="percent" {% if w.stake_rule == 'percent' %}selected{% endif %}>bakiyenin %'si</option><option value="fixed" {% if w.stake_rule == 'fixed' %}selected{% endif %}>sabit ₺</option></select>
           <input type="text" name="deger" value="{{ '%g'|format(w.stake_value) }}" size="4" aria-label="Değer">
           <button class="btn small light" type="submit">Kaydet</button>
         </form>{% endif %}</td>
-      <td>
+      <td class="wide">
         <form method="post" action="/kasalar/{{ w.id }}/sifirla" style="display:inline" data-confirm="{{ w.name }} kasası başlangıç parasına dönecek ve kupon geçmişi silinecek. Emin misiniz?"><button class="linkbtn" type="submit">Sıfırla</button></form>
         <form method="post" action="/kasalar/{{ w.id }}/sil" style="display:inline; margin-left:.5rem" data-confirm="{{ w.name }} kasası ve bütün kuponları silinecek. Bu geri alınamaz. Emin misiniz?"><button class="linkbtn" type="submit">Sil</button></form>
       </td>

@@ -110,8 +110,8 @@
   <div class="grid2">
     {% for g, label in group_labels.items() %}
     <div><h3>{{ label }}</h3>
-      {% if calib[g] %}<table><tr><th>Söylenen</th><th class="num">Gerçekleşen</th><th class="num">Maç</th></tr>
-        {% for b in calib[g] %}<tr><td>{{ b[0]|pct }}</td><td class="num">{{ b[1]|pct }}</td><td class="num">{{ b[2] }}</td></tr>{% endfor %}</table>
+      {% if calib[g] %}<div class="table-wrap"><table><tr><th>Söylenen</th><th class="num">Gerçekleşen</th><th class="num">Maç</th></tr>
+        {% for b in calib[g] %}<tr><td>{{ b[0]|pct }}</td><td class="num">{{ b[1]|pct }}</td><td class="num">{{ b[2] }}</td></tr>{% endfor %}</table></div>
       {% else %}<p class="soft">Henüz sonuçlanmış tahmin yok.</p>{% endif %}</div>
     {% endfor %}
   </div>
@@ -128,17 +128,17 @@
   </table></div>
   <p class="soft"><small>Log-loss düşük olan daha iyidir. "Basit tahmin", her maça ligin ortalama ev/beraberlik/deplasman oranlarını veren tahmindir.</small></p>
   <h3>Model emin olduğunda ne oldu?</h3>
-  <table><tr><th>Modelin en olası seçimi</th><th class="num">Maç</th><th class="num">Ortalama söylenen</th><th class="num">Tuttu</th></tr>
-    {% for r in bt.confidence %}<tr><td>en az {{ r.min_prob|pct }}</td><td class="num">{{ r.n }}</td><td class="num">{{ r.avg_prob|pct }}</td><td class="num">{{ r.hit|pct }}</td></tr>{% endfor %}</table>
+  <div class="table-wrap"><table><tr><th>Modelin en olası seçimi</th><th class="num">Maç</th><th class="num">Ortalama söylenen</th><th class="num">Tuttu</th></tr>
+    {% for r in bt.confidence %}<tr><td>en az {{ r.min_prob|pct }}</td><td class="num">{{ r.n }}</td><td class="num">{{ r.avg_prob|pct }}</td><td class="num">{{ r.hit|pct }}</td></tr>{% endfor %}</table></div>
   <ul class="reasons" style="margin-top:.75rem">{% for n in bt.notes %}<li><small>{{ n }}</small></li>{% endfor %}</ul>
   {% else %}<p class="soft">Geçmiş test henüz çalıştırılmadı (<code>python -m app.cli backtest</code>).</p>{% endif %}
 
   <h3 style="margin-top:1.25rem">Makine öğrenmesi katmanı</h3>
-  <table><tr><th>Pazar</th><th>Durum</th><th class="num">Katman 1 log-loss</th><th class="num">Katman 2 log-loss</th></tr>
+  <div class="table-wrap"><table><tr><th>Pazar</th><th>Durum</th><th class="num">Katman 1 log-loss</th><th class="num">Katman 2 log-loss</th></tr>
   {% for g, label in group_labels.items() %}{% set mt = l2_metrics.get(g, {}) %}
     <tr><td>{{ label }}</td><td>{{ 'açık' if l2_active.get(g) else 'kapalı' }}</td>
       <td class="num">{{ '%.4f'|format(mt.l1_ll) if mt.l1_ll is defined else '–' }}</td><td class="num">{{ '%.4f'|format(mt.l2_ll) if mt.l2_ll is defined else '–' }}</td></tr>
-  {% endfor %}</table>
+  {% endfor %}</table></div>
   <p class="soft"><small>Katman 2 yalnızca testte tahmini iyileştirdiyse açık kalır; haftada bir yeniden eğitilir.</small></p>
 </details>
 {% endblock %}

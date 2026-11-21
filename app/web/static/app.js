@@ -109,8 +109,8 @@
   });
 })();
 
-// Koyu / açık tema: düğmeye basınca anında değişir (geçiş animasyonu yok: uzun sayfalarda takılıyordu);
-// seçim tarayıcıda hatırlanır.
+// Koyu / açık tema: düğmeye basınca sayfa kısa bir solmayla değişir (View Transitions; desteklemeyen
+// tarayıcıda ve "hareketi azalt" açıkken anında). Seçim tarayıcıda hatırlanır.
 (function () {
   const root = document.documentElement;
   const btn = document.querySelector('.theme-toggle');
@@ -123,11 +123,16 @@
   label();
   if (!btn) return;
   btn.addEventListener('click', () => {
-    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    root.setAttribute('data-theme', next);
-    try { localStorage.setItem('tema', next); } catch (e) {}
-    label();
-    document.dispatchEvent(new CustomEvent('temadegisti', {detail: next}));
+    const apply = () => {  // hedef tema uygulandığı anda hesaplanır: art arda iki tıklama ikisi de sayılır
+      const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem('tema', next); } catch (e) {}
+      label();
+      document.dispatchEvent(new CustomEvent('temadegisti', {detail: next}));
+    };
+    const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (document.startViewTransition && !reduce) document.startViewTransition(apply);
+    else apply();
   });
 })();
 
