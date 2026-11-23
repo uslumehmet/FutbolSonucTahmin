@@ -276,3 +276,29 @@ def test_merge_team_keeps_finished_pair_with_different_scores(session):
     merge_team(session, temp.id, lyon.id)
 
     assert session.query(Match).filter_by(home_team_id=lille.id, away_team_id=lyon.id).count() == 2
+
+
+def test_merge_team_drops_placeholder_predictions_of_unmatched_copy(session):
+    """Eşleşmemiş kopyanın tahminleri boş yer tutucudur ("eşleşmedi"); asıl tahminle aynı saatte yazılmış olabilir.
+    Taşınsalardı maç sayfası son tahmin olarak boş olanı gösterirdi (21 Kas 2026 bulut verisi)."""
+    from app.model.predict import latest_prediction
+    from app.models import Prediction
+
+    lyon = get_or_create_team(session, "of", "Olympique Lyonnais", "club")
+    lille = get_or_create_team(session, "of", "Lille OSC", "club")
+    temp = Team(name="Lyon", kind="club", is_temp=True)
+    session.add(temp)
+    session.commit()
+    at = datetime(2026, 11, 21, 6, 11, tzinfo=timezone.utc)
+    espn_m = _finished(session, lille, lyon, 0, 1, stats={"summary": "ok"})
+    session.add(Prediction(match_id=espn_m.id, kind="live", created_at=at, lam_home=1.38, lam_away=1.2,
+                           probs={"MS1": 0.4}))
+    session.commit()
+    api_m = _finished(session, lille, temp, 0, 1, api_fixture_id=1552820, unmatched=True)
+    session.add(Prediction(match_id=api_m.id, kind="live", created_at=at, probs={}, flags=["eşleşmedi"]))
+    session.commit()
+
+    merge_team(session, temp.id, lyon.id)
+
+    assert latest_prediction(session, espn_m.id).probs == {"MS1": 0.4}
+    assert session.query(Prediction).filter_by(match_id=espn_m.id).count() == 1

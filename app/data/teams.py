@@ -215,6 +215,9 @@ def _join_finished_duplicates(session, team_id: int) -> None:
         if len(twins) != 1:
             continue
         keep = twins[0]
+        # Eşleşmemiş kopyanın tahminleri boş yer tutucudur ("eşleşmedi"); taşınırsa son tahmin diye o görünür.
+        session.query(Prediction).filter(Prediction.match_id == m.id, Prediction.lam_home.is_(None)).delete(
+            synchronize_session=False)
         for table in (OddsQuote, Prediction, MissingPlayer, CouponPick, SinglePick):
             session.query(table).filter_by(match_id=m.id).update({"match_id": keep.id}, synchronize_session=False)
         keep.stats = {**(m.stats or {}), **(keep.stats or {})}
