@@ -32,7 +32,7 @@
     <div class="pbar-legend"><span>1: {{ m.home_team.name }} kazanır</span><span>X: beraberlik</span><span>2: {{ m.away_team.name }} kazanır</span></div>
   {% endif %}
   {% if m.status == 'finished' and pred %}<p style="margin-top:.75rem"><b>Sonuç: {{ m.home_goals }}–{{ m.away_goals }}</b></p>{% endif %}
-  {% if pred and pred.flags %}<p style="margin-top:.75rem">{% for f in pred.flags %}<span class="flag {% if f == 'eşleşmedi' %}warn{% endif %}">{{ f }}</span> {% endfor %}</p>{% endif %}
+  {% if flags %}<p style="margin-top:.75rem">{% for f in flags %}<span class="flag {% if f == 'eşleşmedi' %}warn{% endif %}"{% if FLAG_TIPS.get(f) %} data-tip="{{ FLAG_TIPS[f] }}" tabindex="0"{% endif %}>{{ f }}</span> {% endfor %}</p>{% endif %}
   {% if m.unmatched %}<div class="notice error" style="margin-top:.75rem">Takımlardan biri geçmiş verideki bir takımla eşleşmedi, bu yüzden tahmin yapılmadı. <a href="/ayarlar#eslestirme">Ayarlar'dan eşleştirin</a>.</div>{% endif %}
 </section>
 

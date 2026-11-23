@@ -215,3 +215,17 @@ def test_match_page_shows_stats_and_lineups(client_seeded, session_factory):
 def test_match_detail_shows_model_probability_when_blended(client_seeded):
     html = client_seeded.get(f"/mac/{client_seeded.match_ids[0]}").text
     assert 'class="pmodel"' in html and "bahisçi oranının birleşimidir" in html
+
+
+def test_unknown_missing_effect_label_is_not_contradictory(client_seeded, session_factory):
+    """23 Kas 2026: maç satırında "4 eksik" ile "eksik verisi yok" yan yana çelişkili okunuyordu.
+    Anlamı: bazı eksiklerin istatistiği yok, tahmine etkileri hesaplanmadı."""
+    mid = client_seeded.match_ids[0]
+    with session_factory() as s:
+        for p in s.query(Prediction).filter_by(match_id=mid):
+            p.flags = ["eksik verisi yok"]  # eski tahminlerde saklanan yazı
+        s.commit()
+    for url in ("/?gun=3gun", f"/mac/{mid}"):
+        text = client_seeded.get(url).text
+        assert "eksik verisi yok" not in text
+        assert ">eksiklerin etkisi bilinmiyor<" in text

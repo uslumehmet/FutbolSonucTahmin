@@ -3,7 +3,7 @@
 {% block content %}
 <h1>Kasalar</h1>
 <p class="soft"><small>Kasa adını değiştirmek için adın üzerine tıklayın, yazın ve Kaydet'e basın.</small></p>
-<p class="soft">Sistem kasaları her kupona, varsayılan olarak, güncel bakiyenin %3'ünü yatırır (1.000 ₺ kasada 30 ₺). Bu temkinli bir ayardır: kötü giden birkaç günde kasa batmaz. Daha yüksek tutar için kuralı aşağıdan değiştirebilirsiniz.</p>
+<p class="soft">Her sistem kasası kupon başına kendi tutar kuralı kadar yatırır (tablodaki Kural sütunu). Örneğin bakiyenin %10'u: 1.000 ₺ kasada 100 ₺, kasa küçüldükçe tutar da küçülür. Yeni kasa açarken önerilen değer %3'tür; bu temkinli bir ayardır, kötü giden birkaç günde kasa batmaz. Kuralı aşağıdan istediğiniz zaman değiştirebilirsiniz.</p>
 <p class="soft">Her kasa sanal parayla başlar. Sistem kasaları her gün kendi modunun kuponlarını kendi tutar kuralıyla oynar; aynı modun kasaları aynı kuponları oynar, sadece tutarları farklıdır.</p>
 <section class="panel">
   <div class="table-wrap"><table class="stack">
@@ -12,7 +12,7 @@
     <tr>
       <td class="wide">
         <form class="rename" method="post" action="/kasalar/{{ w.id }}/ad">
-          <input type="text" name="ad" value="{{ w.name }}" maxlength="60" required aria-label="Kasa adı" title="Adı değiştirmek için tıklayın">
+          <textarea name="ad" rows="1" maxlength="60" required aria-label="Kasa adı" title="Adı değiştirmek için tıklayın">{{ w.name }}</textarea>
           <button class="btn small" type="submit">Kaydet</button>
         </form>
         <small><a href="/kuponlarim?kasa={{ w.id }}">kuponları</a>{% if w.min_prob %} · en az %{{ (w.min_prob * 100)|round|int }} ihtimal{% endif %}{% if w.busted %} · <span class="wallet-busted">battı</span>{% endif %}</small>

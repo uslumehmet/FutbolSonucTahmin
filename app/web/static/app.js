@@ -190,6 +190,20 @@
   document.addEventListener('htmx:afterSwap', e => e.target.querySelectorAll && e.target.querySelectorAll('details').forEach(prepare));
 })();
 
+// Kasa adı kutusu: yüksekliği içeriğe uyar (field-sizing desteklemeyen tarayıcılar için), Enter kaydeder.
+document.querySelectorAll('.rename textarea').forEach((t) => {
+  const fit = () => {  // border-box: yükseklik kenarlığı da içerir
+    t.style.height = 'auto';
+    t.style.height = (t.scrollHeight + t.offsetHeight - t.clientHeight) + 'px';
+  };
+  fit();
+  t.addEventListener('input', fit);
+  window.addEventListener('resize', fit);
+  t.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); t.form.requestSubmit(); }
+  });
+});
+
 // Geri alınamayan işlemlerden (kasa silme, sıfırlama) önce onay iste.
 document.addEventListener('submit', (e) => {
   const msg = e.target.getAttribute && e.target.getAttribute('data-confirm');

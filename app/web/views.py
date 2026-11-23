@@ -13,14 +13,25 @@ from app.model.explain import explain
 from app.model.features import head_to_head, recent_matches
 from app.model.injuries import MissingImpact
 from app.model.markets import MARKETS, market_label
-from app.model.predict import latest_prediction, repredict
+from app.model.predict import MISSING_UNKNOWN_FLAG, latest_prediction, repredict
 from app.models import Competition, Match, MissingPlayer, Team
 
 DAY_WINDOWS = {"bugun": (0, 1), "yarin": (1, 2), "3gun": (0, 3), "7gun": (0, 7)}
 DAY_LABELS = {"bugun": "Bugün", "yarin": "Yarın", "3gun": "3 gün"}  # kupon sayfası (oran gereken aralık)
 MATCH_DAY_LABELS = {**DAY_LABELS, "7gun": "7 gün"}  # maçlar sayfası
 SCHEDULE_FLAG = "oran 1 gün önce gelir"
+LEGACY_FLAGS = {"eksik verisi yok": MISSING_UNKNOWN_FLAG}  # eski tahminlerde saklanan yazılar
+FLAG_TIPS = {
+    SCHEDULE_FLAG: "Bu maç sezon fikstüründen geldi; saat değişebilir. Oranlar ve eksik oyuncular maçtan bir gün "
+                   "önce API-Football'dan gelir, kupon da o zaman kurulabilir.",
+    MISSING_UNKNOWN_FLAG: "Eksik oyunculardan bazılarının istatistiği gelmedi; bu oyuncuların tahmine etkisi "
+                          "hesaplanmadı. Maç sayfasından önemlerini seçip elle ekleyebilirsiniz.",
+}
 SHOWN = ("scheduled", "finished", "postponed", "cancelled", "abandoned")
+
+
+def shown_flags(flags) -> list[str]:
+    return [LEGACY_FLAGS.get(f, f) for f in (flags or [])]
 
 
 def day_window(now: datetime, gun: str) -> tuple[datetime, datetime]:
@@ -61,7 +72,7 @@ def match_rows(session, now: datetime, gun: str, lig: str | None) -> list[dict]:
     for m in q.order_by(Match.kickoff_utc).all():
         pred = latest_prediction(session, m.id)
         probs = pred.probs if pred else {}
-        flags = list(pred.flags) if pred else []
+        flags = shown_flags(pred.flags) if pred else []
         if m.unmatched and "eşleşmedi" not in flags:
             flags.append("eşleşmedi")
         pk = picks_for(session, m, probs, "veri az" in flags)
@@ -167,7 +178,8 @@ def match_detail(session, match_id: int, now: datetime) -> dict | None:
     team_titles = {"Ev sahibi golleri": f"{m.home_team.name} golleri (ev sahibi)",
                    "Deplasman golleri": f"{m.away_team.name} golleri (deplasman)"}
     sections = [(team_titles.get(t, t), rows) for t, rows in sections if rows]
-    return {"m": m, "pred": pred, "probs": probs, "markets": markets, "picks": pk, "form": form, "h2h": h2h,
+    return {"m": m, "pred": pred, "flags": shown_flags(pred.flags) if pred else [], "probs": probs,
+            "markets": markets, "picks": pk, "form": form, "h2h": h2h,
             "blended": bool(model_probs),
             "sections": sections, "h2h_rows": h2h_rows(session, home.id, away.id, before, 6),
             "odds_time": odds_time,

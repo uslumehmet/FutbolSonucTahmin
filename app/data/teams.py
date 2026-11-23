@@ -5,6 +5,7 @@ import csv
 import difflib
 import re
 import unicodedata
+from datetime import timedelta
 from pathlib import Path
 
 from sqlalchemy import or_
@@ -159,6 +160,7 @@ def merge_team(session, temp_team_id: int, canonical_team_id: int) -> None:
     session.flush()
     _refresh_unmatched(session, canonical_team_id)
     _drop_planned_duplicates(session, canonical_team_id)
+    _join_finished_duplicates(session, canonical_team_id)
     session.commit()
 
 
@@ -184,6 +186,42 @@ def _drop_planned_duplicates(session, team_id: int) -> None:
             session.query(OddsQuote).filter_by(match_id=d.id).delete()
             session.query(Prediction).filter_by(match_id=d.id).delete()
             session.delete(d)
+    session.flush()
+
+
+DUPLICATE_WINDOW = timedelta(hours=36)  # upsert_api_fixture ile aynı: maç saati kaynaklar arasında kayabilir
+
+
+def _join_finished_duplicates(session, team_id: int) -> None:
+    """Takım eşleşmemişken aynı maç iki kez bitmiş olabilir: ESPN sonucu asıl takımın kaydına, API kaydı geçici
+    takıma yazılır (21 Kasım 2026: Lille–Lyon, Lorient–Rennes). Eşleştirince ikisi tek kayıtta birleşir.
+
+    Asıl takımın kaydı kalır (tahminleri ve kupon seçimleri ona bağlı); API kimliği, oranlar, eksikler ve
+    varsa seçimler ona taşınır. Skorlar farklıysa ya da aday birden fazlaysa hangisinin doğru olduğu bilinmez,
+    dokunulmaz.
+    """
+    from app.models import CouponPick, MissingPlayer, OddsQuote, Prediction, SinglePick
+
+    api_matches = session.query(Match).filter(
+        or_(Match.home_team_id == team_id, Match.away_team_id == team_id),
+        Match.api_fixture_id.isnot(None), Match.status == "finished").all()
+    for m in api_matches:
+        twins = session.query(Match).filter(
+            Match.id != m.id, Match.competition_id == m.competition_id, Match.season == m.season,
+            Match.home_team_id == m.home_team_id, Match.away_team_id == m.away_team_id,
+            Match.api_fixture_id.is_(None), Match.status == "finished",
+            Match.home_goals == m.home_goals, Match.away_goals == m.away_goals,
+            Match.kickoff_utc.between(m.kickoff_utc - DUPLICATE_WINDOW, m.kickoff_utc + DUPLICATE_WINDOW)).all()
+        if len(twins) != 1:
+            continue
+        keep = twins[0]
+        for table in (OddsQuote, Prediction, MissingPlayer, CouponPick, SinglePick):
+            session.query(table).filter_by(match_id=m.id).update({"match_id": keep.id}, synchronize_session=False)
+        keep.stats = {**(m.stats or {}), **(keep.stats or {})}
+        fixture_id = m.api_fixture_id
+        session.delete(m)
+        session.flush()  # api_fixture_id benzersiz: önce eski kayıt gitmeli
+        keep.api_fixture_id = fixture_id
     session.flush()
 
 

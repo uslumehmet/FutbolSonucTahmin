@@ -84,3 +84,26 @@ def test_extra_features_are_leak_free_and_track_core_lineup():
     assert f.loc[1, "a_sot5"] == 2 and f.loc[1, "a_sota5"] == 4
     assert np.isnan(f.loc[4, "h_xi_core"]) and f.loc[5, "h_xi_core"] == 1.0  # en az 5 ilk 11 gerekir
     assert f.loc[6, "h_xi_core"] == 8 / 11 and f.loc[6, "h_xi_changes"] == 3
+
+
+def test_unmatched_match_left_out_of_model_and_recent_matches(session):
+    """Geçici takımla yazılmış API kaydı (Lille–"Lyon") aynı maçın asıl kaydıyla birlikte duruyorsa
+    Lille'in maçı iki kez sayılmasın: eşleşmemiş maç ne model tablosuna ne son maçlara girer."""
+    from app.model.store import competition_frame
+    from app.models import Team
+
+    comp = session.query(Competition).filter_by(code="F1").one()
+    lille = get_or_create_team(session, "of", "Lille OSC", "club")
+    lyon = get_or_create_team(session, "of", "Olympique Lyonnais", "club")
+    temp = Team(name="Lyon", kind="club", is_temp=True)
+    session.add(temp)
+    session.flush()
+    for away, unmatched in ((lyon, False), (temp, True)):
+        session.add(Match(competition_id=comp.id, season=2026, kickoff_utc=T0, home_team_id=lille.id,
+                          away_team_id=away.id, status="finished", home_goals=0, away_goals=1, stats={},
+                          unmatched=unmatched))
+    session.commit()
+    df = competition_frame(session, [comp.id])
+    assert list(df["away_id"]) == [lyon.id]
+    rec = recent_matches(session, lille.id, before=T0 + timedelta(days=1))
+    assert [r.opponent for r in rec] == ["Olympique Lyonnais"]

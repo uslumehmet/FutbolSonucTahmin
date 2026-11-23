@@ -99,7 +99,8 @@ def _names(session, matches) -> tuple[dict[int, str], dict[int, str]]:
 
 
 def recent_matches(session, team_id: int, before: datetime, n: int = 10, venue: str | None = None) -> list[RecentMatch]:
-    q = session.query(Match).filter(Match.status == "finished", Match.kickoff_utc < before)
+    q = session.query(Match).filter(Match.status == "finished", Match.kickoff_utc < before,
+                                    Match.unmatched.isnot(True))
     if venue == "E":
         q = q.filter(Match.home_team_id == team_id, Match.neutral.is_(False))
     elif venue == "D":

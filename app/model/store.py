@@ -26,7 +26,9 @@ def day_start_utc(as_of: date) -> datetime:
 def competition_frame(session, comp_ids: list[int]) -> pd.DataFrame:
     q = session.query(Match.id, Match.kickoff_utc, Match.home_team_id, Match.away_team_id, Match.home_goals,
                       Match.away_goals, Match.status, Match.season, Match.neutral, Match.stats,
-                      Match.competition_id).filter(Match.competition_id.in_(comp_ids))
+                      Match.competition_id).filter(Match.competition_id.in_(comp_ids),
+                                                   # geçici takımlı kayıt aynı maçın ikinci kopyası olabilir
+                                                   Match.unmatched.isnot(True))
     rows = [dict(r._mapping) for r in q]
     df = pd.DataFrame(rows, columns=["id", "kickoff_utc", "home_team_id", "away_team_id", "home_goals", "away_goals",
                                      "status", "season", "neutral", "stats", "competition_id"])

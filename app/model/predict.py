@@ -30,6 +30,11 @@ class MatchPrediction:
     model_probs: dict[str, float] | None = None  # bahisçi oranıyla birleştirmeden önceki model ihtimalleri
 
 
+# Eksik oyunculardan en az birinin istatistiği yok: tahmine etkisi hesaplanmadı (0 sayıldı).
+# Eskiden "eksik verisi yok" yazıyordu; "4 eksik" etiketinin yanında çelişkili okunuyordu.
+MISSING_UNKNOWN_FLAG = "eksiklerin etkisi bilinmiyor"
+
+
 def missing_impacts(session, match: Match) -> tuple[list[MissingImpact], list[MissingImpact], list[dict], bool]:
     """(ev eksikleri, deplasman eksikleri, anlık görüntü, istatistik eksik mi)."""
     home, away, snap, lacking = [], [], [], False
@@ -72,7 +77,7 @@ def predict_match(session, store: ModelStore, match: Match, now: datetime) -> Ma
             flags.append("veri az")
     home_m, away_m, snap, lacking = missing_impacts(session, match)
     if lacking:
-        flags.append("eksik verisi yok")
+        flags.append(MISSING_UNKNOWN_FLAG)
     lam, mu = adjust_lambdas(lam, mu, home_m, away_m)
     matrix = score_matrix(lam, mu, rho)
     probs = market_probs(matrix)

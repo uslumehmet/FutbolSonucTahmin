@@ -97,7 +97,7 @@ def make_templates() -> Jinja2Templates:
     static = WEB_DIR / "static"
     asset_v = str(int(max((static / f).stat().st_mtime for f in ("app.css", "app.js"))))  # önbellek kırıcı
     t.env.globals.update(AUTH_ON=lambda: bool(site_password()), ASSET_V=asset_v, MARKET_LABELS=MARKET_LABELS, market_label=market_label, market_html=market_html, market_parts=market_parts, MARKET_HELP=MARKET_HELP, MARKET_SECTIONS=MARKET_SECTIONS,
-                         ROLES=ROLES, LEVELS=list(LEVELS))
+                         ROLES=ROLES, LEVELS=list(LEVELS), FLAG_TIPS=views.FLAG_TIPS)
     return t
 
 

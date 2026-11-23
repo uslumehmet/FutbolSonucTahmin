@@ -218,3 +218,61 @@ def test_promoted_teams(session):
     play(2026, temp, old)
     session.commit()
     assert [(c.code, t.name) for c, t in promoted_teams(session, date(2026, 11, 22))] == [("T1", "Amed")]
+
+
+def _finished(session, home, away, hg, ag, api_fixture_id=None, unmatched=False, stats=None):
+    m = _match(session, home, away, unmatched=unmatched)
+    m.status, m.home_goals, m.away_goals = "finished", hg, ag
+    m.api_fixture_id, m.stats = api_fixture_id, stats or {}
+    session.commit()
+    return m
+
+
+def test_merge_team_joins_finished_duplicate(session):
+    """Lille–Lyon (21 Kas 2026): ESPN sonucu asıl takımın plan maçına, API kaydı geçici takıma yazılmıştı.
+    Eşleştirince tek maç kalır: tahmini, kupon seçimi ve ESPN istatistiği olan kayıt, API kimliği ve oranıyla."""
+    from app.models import Coupon, CouponPick, OddsQuote, Prediction
+
+    lyon = get_or_create_team(session, "of", "Olympique Lyonnais", "club")
+    lille = get_or_create_team(session, "of", "Lille OSC", "club")
+    temp = Team(name="Lyon", kind="club", is_temp=True, api_id=80)
+    session.add(temp)
+    session.commit()
+    espn_m = _finished(session, lille, lyon, 0, 1, stats={"summary": "ok"})
+    session.add(Prediction(match_id=espn_m.id, kind="live", probs={"MS1": 0.4}))
+    coupon = Coupon(mode="safe", source="user", target_odds=2.0, total_odds=2.0, prob=0.5, status="lost",
+                    play_date=datetime(2026, 11, 21).date())
+    coupon.picks = [CouponPick(match_id=espn_m.id, market="MS2", odds=2.0, prob=0.5, result="won")]
+    session.add(coupon)
+    api_m = _finished(session, lille, temp, 0, 1, api_fixture_id=1552820, unmatched=True)
+    session.add(OddsQuote(match_id=api_m.id, bookmaker="b365", market="MS2", odds=2.1,
+                          fetched_at=datetime(2026, 11, 21, 8, tzinfo=timezone.utc), source="api"))
+    session.commit()
+    espn_id, api_row_id = espn_m.id, api_m.id
+
+    merge_team(session, temp.id, lyon.id)
+
+    pair = session.query(Match).filter_by(home_team_id=lille.id, away_team_id=lyon.id).all()
+    assert [m.id for m in pair] == [espn_id]
+    kept = pair[0]
+    assert (kept.api_fixture_id, kept.home_goals, kept.away_goals, kept.unmatched) == (1552820, 0, 1, False)
+    assert kept.stats.get("summary") == "ok"
+    assert session.get(Match, api_row_id) is None
+    assert session.query(OddsQuote).filter_by(match_id=espn_id).count() == 1
+    assert session.query(Prediction).filter_by(match_id=espn_id).count() == 1
+    assert session.query(CouponPick).filter_by(match_id=espn_id).count() == 1
+
+
+def test_merge_team_keeps_finished_pair_with_different_scores(session):
+    """Skorlar farklıysa hangisinin doğru olduğu bilinmez: iki kayda da dokunulmaz."""
+    lyon = get_or_create_team(session, "of", "Olympique Lyonnais", "club")
+    lille = get_or_create_team(session, "of", "Lille OSC", "club")
+    temp = Team(name="Lyon", kind="club", is_temp=True)
+    session.add(temp)
+    session.commit()
+    _finished(session, lille, lyon, 0, 1)
+    _finished(session, lille, temp, 2, 1, api_fixture_id=1552820, unmatched=True)
+
+    merge_team(session, temp.id, lyon.id)
+
+    assert session.query(Match).filter_by(home_team_id=lille.id, away_team_id=lyon.id).count() == 2

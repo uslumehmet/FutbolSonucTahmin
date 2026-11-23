@@ -57,7 +57,7 @@
       {% elif not r.picks.value and r.picks.cands %}<span class="flag">değerli seçim yok</span>{% endif %}
       {% if r.picks.book == 'AVG' %}<span class="flag">oranlar ort.</span>{% endif %}
       {% if r.missing %}<span class="flag">{{ r.missing }} eksik</span>{% endif %}
-      {% for f in r.flags %}<span class="flag {% if f in ('eşleşmedi', 'oran yok') %}warn{% endif %}"{% if f == 'oran 1 gün önce gelir' %} data-tip="Bu maç sezon fikstüründen geldi; saat değişebilir. Oranlar ve eksik oyuncular maçtan bir gün önce API-Football'dan gelir, kupon da o zaman kurulabilir." tabindex="0"{% endif %}>{{ f }}</span>{% endfor %}
+      {% for f in r.flags %}<span class="flag {% if f in ('eşleşmedi', 'oran yok') %}warn{% endif %}"{% if FLAG_TIPS.get(f) %} data-tip="{{ FLAG_TIPS[f] }}" tabindex="0"{% endif %}>{{ f }}</span>{% endfor %}
     </div>
   </a>
   {% endfor %}
