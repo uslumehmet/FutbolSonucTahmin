@@ -157,8 +157,13 @@ def test_header_has_brand_and_mobile_menu(client_seeded):
 
 
 def test_schedule_only_match_says_odds_come_later(client_seeded, session_factory):
+    """API yanıt verirken: fikstürden gelen maçta "oran 1 gün önce gelir", API maçında oran yoksa "oran yok".
+    (API yanıt vermezken ikisi de "API verisi yok" der: tests/web/test_no_api_warnings.py)"""
+    from app.config import set_value
     from app.models import OddsQuote
+    from tests.helpers import NOW
     with session_factory() as s:
+        set_value(s, "api_status", {"ok": True, "at": NOW.isoformat(), "last_ok": NOW.isoformat()})
         mid = client_seeded.match_ids[0]
         s.query(OddsQuote).filter_by(match_id=mid).delete()
         s.get(Match, mid).api_fixture_id = None

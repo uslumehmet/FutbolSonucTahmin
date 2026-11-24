@@ -10,7 +10,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from app.config import CLUB_LEAGUES, TZ, api_key, current_season_start, get_settings, set_value
+from app.config import CLUB_LEAGUES, TZ, api_allowed, api_key, current_season_start, get_settings, set_value
 from app.models import JobRun
 
 log = logging.getLogger(__name__)
@@ -24,7 +24,9 @@ def make_api(session):
     from app.data.api_football import ApiFootball
 
     key = api_key(session)
-    return ApiFootball(session, key, daily_limit=get_settings(session).api_daily_limit) if key else None
+    if not key or not api_allowed():  # GitHub ve Render'dan API'ye istek atılmaz (paylaşılan IP)
+        return None
+    return ApiFootball(session, key, daily_limit=get_settings(session).api_daily_limit)
 
 
 def mark_job(sf, job: str, now: datetime) -> None:
@@ -48,6 +50,7 @@ def _done_within(s, job: str, now: datetime, days: int) -> bool:
 
 
 UPDATE_FROM_HOUR = 6  # oranlar 20 saatte bir yenilenir; gece çekilen oran öğlen oyununda bayat kalır
+NIGHT_UPDATE_GAP = timedelta(hours=6)
 
 
 def _report(s, key: str, rep, now: datetime) -> None:
@@ -84,6 +87,16 @@ def daily_update(sf, now: datetime) -> None:
         except Exception as exc:  # noqa: BLE001 - ikinci kaynak asıl işi durdurmamalı
             log.exception("ESPN hatası")
             rep.errors.append(f"ESPN: {exc}")
+        try:  # önümüzdeki maçlar, saatleri, oranları ve milli maçlar: API-Football yanıt vermese de site dolu kalsın
+            from app.data import espn_upcoming
+            from app.data.api_football import api_live
+            up = espn_upcoming.ingest_espn_upcoming(s, now, api_is_live=api_live(s, now))
+            rep.fallbacks.append(f"ESPN: {up.matches} yaklaşan maç ({up.created} yeni), {up.odds} maçta oran"
+                                 + (f", {up.results} milli maç sonucu" if up.results else ""))
+            rep.errors += [f"ESPN eşleşmeyen: {u}" for u in up.unresolved] + [f"ESPN: {e}" for e in up.errors[:5]]
+        except Exception as exc:  # noqa: BLE001
+            log.exception("ESPN yaklaşan maç hatası")
+            rep.errors.append(f"ESPN yaklaşan maçlar: {exc}")
         preds = predict_upcoming(s, ModelStore(s), now, days=PREDICT_DAYS)
         if s.get_bind().dialect.name != "sqlite":  # bilgisayardaki önbellek olduğu gibi kalır
             from app.data.api_football import prune_old_bodies
@@ -227,15 +240,23 @@ def catch_up(sf, now: datetime, settle: bool = True) -> list[str]:
     if settle:
         run("settle_job", settle_job)
     with sf() as s:
-        # Bugünün güncellemesi sabah UPDATE_FROM_HOUR'dan sonra yapılmış olmalı; gece yarısından sonra
-        # (ör. 00:16'da) yapılan güncelleme o günün oranları için sayılmaz.
-        morning = now.astimezone(TZ).replace(hour=UPDATE_FROM_HOUR, minute=0, second=0, microsecond=0)
-        need_update = now.astimezone(TZ).hour >= UPDATE_FROM_HOUR and not s.query(JobRun).filter(
-            JobRun.job == "update", JobRun.finished_at >= morning).first()
+        # Gündüz: bugünün güncellemesi sabah UPDATE_FROM_HOUR'dan sonra yapılmış olmalı; gece yarısından sonra
+        # (ör. 00:16'da) yapılan güncelleme o günün oranları için sayılmaz. Gece (bilgisayar gece açıldıysa):
+        # son NIGHT_UPDATE_GAP içinde güncelleme yoksa yapılır, kupon da hemen ardından kurulur.
+        # Sürekli açık yerel sunucunun 30 dakikalık kontrolü (settle=False) gece hiçbir şey yapmaz, sabahı bekler.
+        local = now.astimezone(TZ)
+        night_wait = local.hour < UPDATE_FROM_HOUR and not settle
+        if local.hour >= UPDATE_FROM_HOUR:
+            cutoff = local.replace(hour=UPDATE_FROM_HOUR, minute=0, second=0, microsecond=0)
+        else:
+            cutoff = now - NIGHT_UPDATE_GAP
+        need_update = not night_wait and not s.query(JobRun).filter(
+            JobRun.job == "update", JobRun.finished_at >= cutoff).first()
     if need_update:
         run("daily_update", daily_update)
     with sf() as s:
-        need_autoplay = now.astimezone(TZ).hour >= 11 and not _done_today(s, "autoplay", now)
+        # Kupon bilgisayar açılınca, güncellemenin hemen ardından kurulur (kullanıcı kararı, 24 Kasım 2026).
+        need_autoplay = not night_wait and not _done_today(s, "autoplay", now)
         need_refresh = not _done_within(s, "refresh", now, 4)
         need_retrain = not _done_within(s, "retrain", now, 8)
     if need_autoplay:

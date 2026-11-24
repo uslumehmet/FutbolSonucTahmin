@@ -17,7 +17,7 @@ Tahmin; gol modeli (Dixon-Coles), Elo puanları, eksik oyuncular ve makine öğr
 
 1. [Python 3.14](https://www.python.org/downloads/) kurun. Kurulumda "Add python.exe to PATH" kutusunu işaretleyin.
 2. Projeyi indirin (**Code → Download ZIP**) ve `baslat.bat` dosyasına çift tıklayın. İlk açılış birkaç dakika sürer, site http://localhost:8765 adresinde açılır.
-3. [API-Football](https://dashboard.api-football.com)'dan ücretsiz anahtar alın ve sitede **Ayarlar** sayfasına yapıştırın.
+3. [API-Football](https://dashboard.api-football.com)'dan ücretsiz anahtar alın ve sitede **Ayarlar** sayfasına yapıştırın. Anahtar olmadan da maçlar ve oranlar ESPN'den gelir; Çifte Şans, Karşılıklı Gol ve sakatlık bilgisi ise yalnızca API-Football'dan.
 
 Telefondan ve bilgisayar kapalıyken kullanmak, ücretsiz planın sınırları ve komutlar: [KURULUM.md](KURULUM.md). Sayfaların kullanımı: [KULLANIM.md](KULLANIM.md).
 

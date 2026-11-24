@@ -39,5 +39,6 @@ def session(session_factory):
 
 @pytest.fixture(autouse=True)
 def _no_real_api_key(monkeypatch):
-    """Testler kullanıcının .env içindeki gerçek API anahtarından etkilenmesin."""
-    monkeypatch.delenv("API_FOOTBALL_KEY", raising=False)
+    """Testler kullanıcının .env içindeki gerçek API anahtarından ve çalıştığı ortamdan etkilenmesin."""
+    for name in ("API_FOOTBALL_KEY", "BAHIS_NO_API", "GITHUB_ACTIONS", "RENDER"):
+        monkeypatch.delenv(name, raising=False)

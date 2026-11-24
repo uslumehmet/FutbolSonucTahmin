@@ -30,11 +30,12 @@ def _ready(session, upcoming=12):
     return ids
 
 
-def test_window():
+def test_window_starts_an_hour_later_and_covers_a_day():
+    """Kupon bilgisayar ne zaman açılırsa o zaman kurulur: bir saat sonrasından 24 saat sonrasına kadar."""
     s, e = autoplay_window(NOW)
     assert s == datetime(2026, 11, 16, 12, 0, tzinfo=TZ) and e == datetime(2026, 11, 17, 11, 0, tzinfo=TZ)
-    assert autoplay_window(datetime(2026, 11, 16, 15, 0, tzinfo=TZ))[1] == datetime(2026, 11, 17, 11, 0, tzinfo=TZ)
-    assert autoplay_window(datetime(2026, 11, 16, 9, 30, tzinfo=TZ))[1] == datetime(2026, 11, 16, 11, 0, tzinfo=TZ)
+    s, e = autoplay_window(datetime(2026, 11, 16, 8, 30, tzinfo=TZ))
+    assert s == datetime(2026, 11, 16, 9, 30, tzinfo=TZ) and e == datetime(2026, 11, 17, 8, 30, tzinfo=TZ)
 
 
 def test_creates_coupons_for_both_modes_and_targets(session):
@@ -162,3 +163,53 @@ def test_create_wallet_rejects_bad_min_prob(session):
     from app.betting.wallets import WalletError
     with pytest.raises(WalletError):
         create_wallet(session, "X", "safe", 100, min_prob=1.2)
+
+
+def _to_espn(session):
+    session.query(OddsQuote).update({"source": "espn", "bookmaker": "DK"})
+    session.commit()
+
+
+def test_espn_only_odds_are_not_played_by_default(session):
+    from app.models import JobRun
+
+    _ready(session)
+    _to_espn(session)
+    rep = run_autoplay(session, NOW)
+    assert rep.coupons == 0 and session.query(SinglePick).count() == 0
+    assert any("API" in k for k in rep.skipped)
+    # API verisi gelince aynı gün yeniden denenebilsin diye gün "oynandı" sayılmaz
+    assert session.query(JobRun).filter_by(job="autoplay").count() == 0
+
+
+def test_espn_odds_are_played_when_allowed_in_settings(session):
+    _ready(session)
+    _to_espn(session)
+    save_settings(session, autoplay_without_api=True)
+    assert run_autoplay(session, NOW).coupons > 0
+
+
+def test_no_autoplay_on_servers_that_do_not_use_the_api(session, monkeypatch):
+    """GitHub'da kupon kurulmaz; kupon bilgisayar açılınca kurulur (ayar açıksa GitHub da kurar)."""
+    from app.models import JobRun
+
+    _ready(session)
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    rep = run_autoplay(session, NOW)
+    assert rep.coupons == 0 and session.query(JobRun).filter_by(job="autoplay").count() == 0
+    save_settings(session, autoplay_without_api=True)
+    assert run_autoplay(session, NOW).coupons > 0
+
+
+def test_matches_played_the_day_before_are_not_played_again(session):
+    ids = _ready(session)
+    late = session.get(Match, ids[0])
+    late.kickoff_utc = datetime(2026, 11, 17, 10, 30, tzinfo=TZ)  # hem dünkü hem bugünkü pencerede
+    session.commit()
+    run_autoplay(session, NOW)
+    played = (session.query(SinglePick).filter_by(match_id=late.id).count(),
+              session.query(CouponPick).filter_by(match_id=late.id).count())
+    assert sum(played) > 0
+    run_autoplay(session, datetime(2026, 11, 17, 8, 0, tzinfo=TZ))
+    assert (session.query(SinglePick).filter_by(match_id=late.id).count(),
+            session.query(CouponPick).filter_by(match_id=late.id).count()) == played

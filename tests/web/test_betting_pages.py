@@ -337,3 +337,16 @@ def test_change_pick_rejects_unknown_market_and_played_coupon(client_seeded, ses
     assert "Oynanmış kupon değiştirilemez" in r.text
     with session_factory() as s:
         assert s.get(CouponPick, pid).market == before
+
+
+def test_kuponlarim_says_why_autoplay_waits_for_api(client_seeded):
+    from app.betting.autoplay import NO_API_DATA
+    from app.config import set_value
+    from tests.helpers import NOW
+
+    with client_seeded.app.state.sf() as s:
+        set_value(s, "last_autoplay", {"coupons": 0, "singles": 0, "skipped": [NO_API_DATA], "at": NOW.isoformat()})
+        from app.models import Wallet
+        wid = s.query(Wallet).filter(Wallet.owner == "safe").first().id
+    html = client_seeded.get(f"/kuponlarim?kasa={wid}").text
+    assert "Otomatik kupon kurulmadı" in html and "uygun maç yoktu" not in html

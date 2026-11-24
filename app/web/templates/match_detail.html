@@ -69,6 +69,9 @@
       <tr><th>Seçim</th><th class="num">Tutma ihtimali</th><th class="num">Oran</th><th class="num">Piyasa</th><th class="num">Değer</th></tr>
       {% for title, rows in sections %}
       <tr class="section-row"><th colspan="5">{{ title }}</th></tr>
+      {% if no_api_odds and rows|selectattr('odds')|list|length == 0 %}
+      <tr class="soft"><td colspan="5"><small data-tip="{{ no_api_text }}" tabindex="0">Oran yok: API-Football'dan veri gelmedi, bu bahis oynanmıyor.</small></td></tr>
+      {% endif %}
       {% for x in rows %}
       <tr data-market="{{ x.key }}" data-prob="{{ (x.prob * 100)|round|int }}">
         <td>{% set mp = market_parts(x.key, m.home_team.name, m.away_team.name) %}<span class="help mlabel" data-tip="{{ MARKET_HELP[x.key] }}" tabindex="0" aria-label="{{ x.label }}: {{ MARKET_HELP[x.key] }}">{{ mp[0] }}{% if mp[1] %}<small class="msub">({{ mp[1] }})</small>{% endif %}</span>
@@ -83,7 +86,7 @@
       {% endfor %}
     </table></div>
     <p class="soft" style="margin-top:.6rem"><small>{% if blended %}Tutma ihtimali, modelin tahmini ile bahisçi oranının birleşimidir; ölçümde ikisinden de isabetli çıktı. Altındaki küçük sayı modelin kendi tahmini.<br>{% endif %}Değer = tutma ihtimali × oran − 1. Pozitif değer, oranın modelin ihtimaline göre yüksek olduğu anlamına gelir.{% if picks.book == 'AVG' %} Bet365 oranı yok, bahisçi ortalaması kullanıldı.{% endif %}
-      <br>Oranların alındığı zaman: {{ odds_time|local_dt if odds_time else 'oran yok' }} ({{ 'Bet365' if picks.book == 'B365' else 'bahisçi ortalaması' }}). Oranlar canlı değildir; her sabah güncellenir.</small></p>
+      <br>Oranların alındığı zaman: {{ odds_time|local_dt if odds_time else 'oran yok' }}{% if book_label %} ({{ book_label }}){% endif %}. Oranlar canlı değildir; günde birkaç kez güncellenir.</small></p>
     {% else %}<p class="soft">Bu maç için tahmin yok.</p>{% endif %}
   </section>
   <section class="panel">

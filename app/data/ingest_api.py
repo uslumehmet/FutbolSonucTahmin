@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
 from app.config import CLUB_LEAGUES, COMPETITION_BY_API_ID, TZ, current_season_start
-from app.data.api_football import ApiError, QuotaExceeded
+from app.data.api_football import ApiBlocked, ApiError, QuotaExceeded
 from app.data.api_parse import parse_api_fixture, parse_api_injury, parse_api_odds, parse_api_player
 from app.data.http import fetch_text
 from app.data.ingest import competition_teams, find_match, ingest_openfootball, matches_of_team
@@ -234,10 +234,16 @@ def _allowed_season(message: str) -> int | None:
     return int(m.group(1)) if m and "plan" in message.lower() else None
 
 
+def blocked_message(exc: Exception) -> str:
+    return (f"API-Football yanıt vermiyor (hesap askıda ya da anahtar geçersiz: {exc}). "
+            "Bu çalıştırmada başka API isteği atılmadı; maçlar ve oranlar ESPN'den.")
+
+
 def ingest_upcoming(session, api, now: datetime, days: int = 2) -> IngestReport:
     rep = IngestReport()
     if api is None:
-        rep.fallbacks.append("API anahtarı yok: yaklaşan maçlar, oranlar ve eksikler alınamadı")
+        rep.fallbacks.append("API-Football kullanılmadı (anahtar yok ya da bu sunucudan API'ye istek atılmıyor): "
+                             "maçlar ve oranlar ESPN'den, eksik oyuncular gelmedi")
         return rep
     local_today = now.astimezone(TZ).date()
     matches: list[Match] = []
@@ -246,6 +252,9 @@ def ingest_upcoming(session, api, now: datetime, days: int = 2) -> IngestReport:
             matches += _ingest_fixture_items(session, api.fixtures_on(d), rep)
         except QuotaExceeded:
             rep.errors.append(f"fikstür: kota doldu ({d})")
+            return rep
+        except ApiBlocked as exc:
+            rep.fallbacks.append(blocked_message(exc))
             return rep
         except ApiError as exc:
             rep.errors.append(f"fikstür hatası {d}: {exc}")
@@ -312,7 +321,7 @@ def refresh_late_odds(session, api, now: datetime) -> list[int]:
             continue
         try:
             items = api.odds_for_fixture(m.api_fixture_id, max_age=timedelta(hours=1))
-        except QuotaExceeded:
+        except (QuotaExceeded, ApiBlocked):
             break
         except ApiError:
             continue
@@ -336,6 +345,9 @@ def ingest_results(session, api, now: datetime, fetch=fetch_text) -> IngestRepor
             rep.results += sum(1 for m in ms if m.status == "finished")
         except QuotaExceeded:
             rep.errors.append("sonuçlar: kota doldu")
+            break
+        except ApiBlocked as exc:
+            rep.errors.append(blocked_message(exc))
             break
         except ApiError as exc:
             rep.errors.append(f"sonuç hatası {d}: {exc}")

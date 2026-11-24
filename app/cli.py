@@ -177,6 +177,42 @@ def cmd_catch_up(_args) -> None:
             print(f"{key}: {get_value(s, key)}")
 
 
+def cloud_db_url() -> str | None:
+    """Buluttaki (Neon) veritabanının adresi: DATABASE_URL, yoksa .env'deki HEDEF_DB_URL."""
+    import os
+
+    from app.config import normalize_db_url
+
+    url = os.environ.get("DATABASE_URL", "").strip() or os.environ.get("HEDEF_DB_URL", "").strip()
+    return normalize_db_url(url) if url else None
+
+
+def cmd_cloud_update(_args) -> None:
+    """Bilgisayardaki görev: buluttaki veritabanına bağlanır, zamanı gelen işleri yapar (KURULUM.md).
+
+    API-Football'a istek yalnızca buradan (ev internetinden) gider; GitHub ve Render'dan gitmez. Kupon da
+    güncellemenin hemen ardından kurulur; Render'daki site aynı veritabanını okuduğu için hemen görünür.
+    """
+    from app import jobs
+
+    url = cloud_db_url()
+    if not url:
+        print("Bulut veritabanı adresi yok. .env dosyasına HEDEF_DB_URL=... (Neon bağlantı adresi) yazın.")
+        return
+    if not url.startswith("postgresql"):
+        print("HEDEF_DB_URL bir PostgreSQL (Neon) adresi olmalı; yerel veritabanına yazılırsa sitede görünmez.")
+        return
+    engine = make_engine(url)
+    init_db(engine)
+    sf = make_session_factory(engine)
+    ran = jobs.catch_up(sf, _utcnow(), settle=True)
+    print(f"{_utcnow().isoformat()} çalışan işler: " + (", ".join(ran) if ran else "yok"))
+    with sf() as s:
+        from app.config import get_value
+        for key in ("last_update", "last_autoplay", "last_settle", "api_status"):
+            print(f"{key}: {get_value(s, key)}")
+
+
 def cmd_espn(args) -> None:
     """ESPN'den eksik maç sonuçlarını doldurur.
 
@@ -234,7 +270,7 @@ def cmd_tasi(args) -> None:
     print(f"Bitti: {sum(counts.values())} satır kopyalandı.")
 
 
-COMMANDS = {"catch-up": cmd_catch_up, "espn": cmd_espn, "tasi": cmd_tasi, "init": cmd_init, "update": cmd_update, "autoplay": cmd_autoplay, "settle": cmd_settle,
+COMMANDS = {"catch-up": cmd_catch_up, "bulut-guncelle": cmd_cloud_update, "espn": cmd_espn, "tasi": cmd_tasi, "init": cmd_init, "update": cmd_update, "autoplay": cmd_autoplay, "settle": cmd_settle,
             "history": cmd_history, "intl": cmd_intl, "probe": cmd_probe, "walkforward": cmd_walkforward,
             "train-layer2": cmd_train_layer2, "backtest": cmd_backtest}
 

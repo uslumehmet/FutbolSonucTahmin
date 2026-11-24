@@ -18,22 +18,22 @@ Bilgisayar kapalıyken sistem çalışmaz. Açtığınızda kaçırdığı işle
 2. Anahtarı **Ayarlar → API-Football** bölümüne yapıştırıp kaydedin.
 3. **"Ücretsiz planın kapsamını dene"** düğmesine basın. Bu sezonun maçları geliyorsa her şey hazır.
 
-Anahtar olmadan yaklaşan maçlar, oranlar ve sakat/cezalı listeleri gelmez; geçmiş veriler ve test raporu yine görünür.
+Anahtar olmadan ya da API yanıt vermezken maçlar, saatler ve oranlar ESPN'den gelir: yalnızca Maç Sonucu ve Alt/Üst; Çifte Şans sadece birkaç büyük maçta, Karşılıklı Gol ve sakat/cezalı listeleri yok. Sitenin üstünde ve maçların yanında "API verisi yok" uyarısı görünür, otomatik kupon kurulmaz (Ayarlar'dan açılabilir).
 
 ## Sistem ne zaman ne yapar (Türkiye saati)
 Site bulutta çalışırken işler GitHub'da yapılır. İşleri cron-job.org saatinde başlatır; GitHub'ın kendi zamanlaması yedektir.
 
 | Saat | İş |
 |---|---|
-| 09:10 | Biten maçlar sonuçlandırılır; yaklaşan maçlar, oranlar, eksik oyuncular ve tahminler güncellenir |
-| 11:10 | Sistem iki moddan (Güvenli, Değerli) 2, 3 ve 5 oranlı kuponları sanal kasalarla oynar |
-| 15:10, 20:10, 23:10 | Biten maçlar sonuçlandırılır; maçına 6 saatten az kalan maçların oranı ve tahmini yenilenir |
+| 09:10 | Biten maçlar sonuçlandırılır; ESPN'den maçlar, saatler ve oranlar alınır, tahminler güncellenir |
+| Bilgisayar açılınca | API-Football'dan bütün oranlar ve eksik oyuncular gelir; sistem iki moddan (Güvenli, Değerli) 2, 3 ve 5 oranlı kuponları sanal kasalarla oynar (KURULUM.md: Bilgisayardaki görev) |
+| 15:10, 20:10, 23:10 | Biten maçlar sonuçlandırılır |
 | Haftada bir | Modeller yeniden eğitilir |
 
-Site sadece bilgisayarda çalıştırılırsa saatler biraz farklıdır: 10:30 güncelleme, 11:00 otomatik oyun, 09:00/15:00/20:00/00:30 sonuçlandırma, Pazartesi 03:00 yeniden eğitim.
+Site sadece bilgisayarda çalıştırılırsa saatler biraz farklıdır: site açılınca (ve 10:30'da) güncelleme, hemen ardından otomatik oyun, 09:00/15:00/20:00/00:30 sonuçlandırma, Pazartesi 03:00 yeniden eğitim.
 
 ## Sayfalar
-- **Maçlar:** Her maçın 1-X-2 ihtimal çubuğu, toplam gol 1.5/2.5 Üst, KG Var ve iki takımın ayrı ayrı 1.5 Üst ihtimali, Güvenli/Değerli seçimi. "7 gün" sekmesi haftanın bütün maçlarını gösterir; "oran 1 gün önce gelir" etiketli maçlar sezon fikstüründen gelmiştir, saatleri değişebilir.
+- **Maçlar:** Her maçın 1-X-2 ihtimal çubuğu, toplam gol 1.5/2.5 Üst, KG Var ve iki takımın ayrı ayrı 1.5 Üst ihtimali, Güvenli/Değerli seçimi. "7 gün" sekmesi haftanın bütün maçlarını gösterir; "oran 1 gün önce gelir" etiketli maçların API-Football oranları maçtan bir gün önce gelir (o zamana kadar varsa ESPN oranı görünür); "API verisi yok" etiketli maçlarda oranlar ESPN'den, Çifte Şans ve Karşılıklı Gol oranı ile sakatlık bilgisi yoktur.
 - **Maç detayı:** Bütün bahis seçenekleri (ihtimal, oran, değer; oran geldiyse ihtimalin altında küçük harfle modelin kendi tahmini), gerekçe, iki takımın son maçları, aralarındaki maçlar, eksik oyuncular. Eksik oyuncuyu elle ekleyebilirsiniz; tahmin hemen güncellenir. "Toplam gol 1.5 Alt" iki takımın gollerinin toplamıdır; "Galler golleri 1.5 Alt" gibi takım adıyla yazanlar sadece o takımın gollerini sayar.
 - **Kupon oluştur:** Hedef oran + mod seçin, sistem en yüksek tutma ihtimalli kuponu kurar; sanal kasanızla oynarsınız. "En düşük tutma ihtimali" (ör. %75) seçerseniz kupona sadece en az o ihtimaldeki seçimler girer. Kurulan kupondan istemediğiniz maçı × ile çıkarabilirsiniz. Bir maçın bahsini de değiştirebilirsiniz: bahis adına tıklayınca o maçın oranı olan bütün bahisler, yanında tutma ihtimali ve oranıyla listelenir (ör. "Toplam gol 1.5 Alt" yerine "Toplam gol 2.5 Alt"). İki durumda da toplam oran ve kuponun tutma ihtimali hemen yeniden hesaplanır. Oynanmış kupon değiştirilemez.
 - **Kuponlarım:** Her kasanın kuponları, tuttu/tutmadı durumu. Üstte sistemin bugünkü otomatik oyununun ne zaman yapıldığı, kaç kupon oynandığı, oynanmadıysa nedeni ve sıradaki maç günü yazar. Otomatik oyun gecikirse, henüz başlamamış maçlarla (başlamasına en az 1 saat olan) yapılır.

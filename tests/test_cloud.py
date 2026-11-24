@@ -80,14 +80,25 @@ def _done(sf, job, at):
         s.commit()
 
 
-def test_no_daily_update_after_midnight(session_factory, monkeypatch):
-    """Gece 00:37'deki kontrol güncelleme yapmaz: oranlar 20 saat saklanır, öğlen oyununda bayat kalırdı."""
+def test_one_shot_run_at_night_updates_and_plays(session_factory, monkeypatch):
+    """Bilgisayar gece açılırsa (tek seferlik çalıştırma) güncelleme yapılır, kupon hemen ardından kurulur;
+    oranlar kuponla aynı anda alındığı için bayat kalmaz. Sabah 06:00'dan sonra güncelleme yeniden yapılır."""
     ran = _stub(monkeypatch)
     jobs.catch_up(session_factory, datetime(2026, 11, 18, 0, 37, tzinfo=TZ), settle=True)
-    assert "daily_update" not in ran and "settle_job" in ran
+    assert ran.index("settle_job") < ran.index("daily_update") < ran.index("daily_autoplay")
+    with session_factory() as s:  # stub iş kaydı bırakmaz; gerçek güncelleme bırakır
+        s.add(JobRun(job="update", run_key="2026-11-18", finished_at=datetime(2026, 11, 18, 0, 37, tzinfo=TZ)))
+        s.commit()
     ran.clear()
     jobs.catch_up(session_factory, datetime(2026, 11, 18, 9, 7, tzinfo=TZ), settle=True)
-    assert "daily_update" in ran and "daily_autoplay" not in ran
+    assert "daily_update" in ran
+
+
+def test_periodic_check_at_night_waits_for_morning(session_factory, monkeypatch):
+    """Sürekli açık yerel sunucunun 30 dakikalık kontrolü gece güncelleme ve kupon yapmaz (sabahı bekler)."""
+    ran = _stub(monkeypatch)
+    jobs.catch_up(session_factory, datetime(2026, 11, 18, 0, 37, tzinfo=TZ), settle=False)
+    assert "daily_update" not in ran and "daily_autoplay" not in ran
 
 
 def test_second_autoplay_call_keeps_first_report(session_factory):

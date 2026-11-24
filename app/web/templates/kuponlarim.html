@@ -19,8 +19,8 @@
 <p class="autoplay-status soft"><small>
   {% if ap.ran_today %}Sistemin bugünkü otomatik oyunu {{ ap.at|local_time }}'de yapıldı:
     {% if ap.coupons %}{{ ap.coupons }} kupon, {{ ap.singles }} tekli.{% else %}uygun maç yoktu, kupon oynanmadı.{% endif %}
-  {% elif ap.before_hour %}Sistemin bugünkü otomatik oyunu 11:00 civarında yapılır.
-  {% else %}Sistemin bugünkü otomatik oyunu henüz yapılmadı; ilk fırsatta, başlamamış maçlarla yapılır.{% endif %}
+  {% elif ap.waiting %}{{ ap.waiting }}
+  {% else %}Sistemin bugünkü otomatik oyunu henüz yapılmadı; bilgisayardaki görev çalışınca (bilgisayar açılınca), başlamamış maçlarla yapılır.{% endif %}
   {% if ap.next_day and (not ap.ran_today or not ap.coupons) %} Sıradaki maçlar: {{ ap.next_day.kickoff|local_day }} ({{ ap.next_day.count }} maç).{% endif %}
 </small></p>
 {% endif %}
@@ -34,7 +34,7 @@
   <div class="stat"><small>Tutan / sonuçlanan</small><b>{{ stats.won }} / {{ stats.played }}</b></div>
   <div class="stat"><small>Açık kupon</small><b>{{ stats.open }}</b></div>
 </div>
-{% if not bets %}<div class="empty">Bu kasada kupon yok.{% if current.owner == 'user' %} <a href="/kupon">Kupon oluşturun</a>.{% else %} Sistem her gün 11:00 civarında oynar.{% endif %}</div>{% endif %}
+{% if not bets %}<div class="empty">Bu kasada kupon yok.{% if current.owner == 'user' %} <a href="/kupon">Kupon oluşturun</a>.{% else %} Sistem her gün bilgisayar açılınca oynar.{% endif %}</div>{% endif %}
 {% if bets %}<p class="slip-hint soft"><small>Bir maça tıklayınca o maçta ne olduğu, seçimin tutması için ne gerektiği ve model maçtan önce ne beklediği açılır.</small></p>{% endif %}
 <div class="slips">
   {% for b in bets %}{% set c = b.coupon %}

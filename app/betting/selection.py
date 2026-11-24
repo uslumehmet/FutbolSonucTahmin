@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.config import Settings
 from app.model.markets import MARKET_GROUP, MARKETS
@@ -73,17 +73,54 @@ def eligible(cands: list[Candidate], mode: str, s: Settings) -> list[Candidate]:
     raise ValueError(mode)
 
 
-def latest_odds(session, match_id: int) -> tuple[str, dict[str, float]] | None:
+API_ODDS_WINDOW = timedelta(hours=24)  # API oranı ESPN oranından en fazla bu kadar eskiyse API oranı esas alınır
+
+
+@dataclass(frozen=True)
+class OddsInfo:
+    book: str  # B365 | AVG (bahisçi ortalaması) | DK (DraftKings)
+    source: str  # api | espn
+    odds: dict[str, float]
+    fetched_at: datetime
+
+
+def odds_info(session, match_id: int) -> OddsInfo | None:
+    """Maçın kullanılacak oranları: tek bir kaynak ve tek bir bahisçi.
+
+    API-Football oranı (Çifte Şans ve Karşılıklı Gol dahil bütün bahisler) yeterince tazeyse o kullanılır;
+    API yanıt vermiyorsa ESPN oranı: Bet365 varsa o (Çifte Şans içerir), yoksa DraftKings.
+    """
     quotes = (session.query(OddsQuote).filter_by(match_id=match_id)
               .order_by(OddsQuote.fetched_at.desc(), OddsQuote.id.desc()).all())
     if not quotes:
         return None
-    book = "B365" if any(q.bookmaker == "B365" for q in quotes) else quotes[0].bookmaker
+    api = [q for q in quotes if q.source == "api"]
+    if api and api[0].fetched_at >= quotes[0].fetched_at - API_ODDS_WINDOW:
+        chosen = api
+    else:
+        chosen = [q for q in quotes if q.source != "api"] or api
+    book = "B365" if any(q.bookmaker == "B365" for q in chosen) else chosen[0].bookmaker
     odds: dict[str, float] = {}
-    for q in quotes:
+    newest = None
+    for q in chosen:
         if q.bookmaker == book and q.market not in odds:
             odds[q.market] = q.odds
-    return book, odds
+            newest = newest or q.fetched_at
+    if chosen[0].source != "api":
+        # ESPN'deki Bet365'te çoğu zaman Alt/Üst yok: eksik bahis türleri (grup grup) DraftKings'ten tamamlanır.
+        # Her grup tek bahisçiden gelir; piyasa ihtimali grup içinde hesaplandığı için karışmaz.
+        group_book = {MARKET_GROUP[m]: book for m in odds if m in MARKET_GROUP}
+        for q in chosen:
+            group = MARKET_GROUP.get(q.market)
+            if group is None or q.market in odds or group_book.setdefault(group, q.bookmaker) != q.bookmaker:
+                continue
+            odds[q.market] = q.odds
+    return OddsInfo(book, chosen[0].source, odds, newest)
+
+
+def latest_odds(session, match_id: int) -> tuple[str, dict[str, float]] | None:
+    info = odds_info(session, match_id)
+    return (info.book, info.odds) if info else None
 
 
 def match_candidates(session, start: datetime, end: datetime, s: Settings) -> dict[int, list[Candidate]]:

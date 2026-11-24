@@ -10,7 +10,7 @@ Kısa tanıtım için [README.md](README.md), sayfaların kullanımı için [KUL
 | Takım gücü | Elo puanları, son maçlar, aralarındaki maçlar |
 | Eksik oyuncular | Sakat ve cezalı oyuncuların hücum ve savunmaya etkisi |
 | Makine öğrenmesi | Lojistik regresyon ve gradient boosting, ardından kalibrasyon. Sadece ölçülerek daha iyi çıkarsa devreye girer |
-| Piyasa ile birleştirme | Oran gelen maçlarda tahmin Bet365 oranıyla birleştirilir; maç sonucunda piyasanın ağırlığı yaklaşık %90, 2.5 Alt/Üst'te %75. 2024–2026'da 1.819 maçlık ölçümde birleşim modelden daha isabetli çıktı. Ayarlar'dan kapatılabilir |
+| Piyasa ile birleştirme | Oran gelen maçlarda tahmin bahisçi oranıyla (Bet365; API-Football yanıt vermezse ESPN'deki DraftKings) birleştirilir; maç sonucunda piyasanın ağırlığı yaklaşık %90, 2.5 Alt/Üst'te %75. 2024–2026'da 1.819 maçlık ölçümde birleşim modelden daha isabetli çıktı. Ayarlar'dan kapatılabilir |
 
 **Geçmiş test (2023–2025, 6.052 maç):** Maç sonucunu doğru tahmin oranı %52,7. Modelin "%70 ve üzeri" dediği seçimler %74,2 oranında tuttu. Geçmişteki başarı gelecekte de aynı olacağı anlamına gelmez. Bahisçinin oranları, tek başına modelden daha isabetli (maç sonucunda %54'e %52); geçmiş oranlarla yapılan testte sitenin seçim kuralları uzun vadede kâra geçmedi.
 
@@ -36,7 +36,9 @@ Kısa tanıtım için [README.md](README.md), sayfaların kullanımı için [KUL
 
 ## Ücretsiz API anahtarı
 
-Yaklaşan maçlar, oranlar ve sakat ya da cezalı oyuncular [API-Football](https://www.api-football.com) üzerinden gelir. Anahtar olmadan da site açılır, ama sadece geçmiş veriler ve test raporu görünür.
+Bütün oranlar (Çifte Şans ve Karşılıklı Gol dahil) ve sakat ya da cezalı oyuncular [API-Football](https://www.api-football.com) üzerinden gelir.
+
+**Anahtar olmadan ya da API yanıt vermezken** site boş kalmaz: önümüzdeki maçlar, saatleri, milli maçlar ve oranlar ESPN'den gelir. ESPN'de yalnızca Maç Sonucu ve Alt/Üst oranları var; Çifte Şans sadece birkaç büyük maçta, Karşılıklı Gol ve sakatlık bilgisi hiç yok. Bu durumda sitenin üstünde ve maçların yanında uyarı görünür, otomatik kupon kurulmaz (Ayarlar → "API verisi yokken de otomatik kupon kur" ile açılabilir).
 
 1. https://dashboard.api-football.com adresinden ücretsiz hesap açın. Kredi kartı istenmez. E-postanızı doğrulayın.
 2. Panelde görünen API anahtarını kopyalayın.
@@ -49,6 +51,7 @@ Yaklaşan maçlar, oranlar ve sakat ya da cezalı oyuncular [API-Football](https
 
 - Günde 100, dakikada 10 istek. Kota her gün yenilenir; ücretsiz plan süresizdir, ay sonunda bitmez. Site isteklerini kendisi yavaşlatır ve her yanıtı önbellekte tutar, böylece aynı veri iki kez istenmez. Sayfaları gezmek istek harcamaz; istekleri sadece günlük güncelleme ve Ayarlar'daki deneme düğmesi kullanır. Yoğun bir hafta sonu günü yaklaşık 40–60 istek gider. Kota dolarsa sistem durur ve ertesi gün kaldığı yerden devam eder.
 - Kotayı artırmak için birden fazla ücretsiz hesap açmak API-Football [kurallarına](https://www.api-football.com/terms) aykırıdır; hesap kapatılabilir.
+- **Paylaşılan IP:** API-Football, aynı IP adresinde birden fazla ücretsiz hesap görünce hesabı otomatik askıya alıyor; tek hesabınız olsa bile. Bulut sunucuları (GitHub Actions, Render), VPN, mobil veri ve Superbox gibi mobil şebekeden çıkan internetler IP'yi başka kullanıcılarla paylaşır. Bu yüzden API'ye yalnızca ev internetine bağlı bilgisayardan istek atılır; GitHub ve Render'dan atılmaz (aşağıda: Bilgisayardaki görev).
 - Tarihe göre maç sorgusu sadece dün, bugün ve yarın için çalışır. Bu yüzden ileriki günlerin maçları openfootball'daki sezon fikstüründen alınır; oranları ve kesin saati maçtan bir gün önce gelir. Kupon da o zaman kurulabilir.
 - Lig ve sezon sorguları sadece 2022–2024 sezonları için çalışır. Bu sezonun ve eski sezonların eksik kalan sonuçları ESPN'den tamamlanır (aşağıda).
 
@@ -70,8 +73,8 @@ Yaklaşan maçlar, oranlar ve sakat ya da cezalı oyuncular [API-Football](https
 
 | Saat | İş |
 |---|---|
-| 10:30 | Yaklaşan maçlar, oranlar, eksik oyuncular ve sonuçlar çekilir, tahminler yenilenir |
-| 11:00 | Sistem kasaları sanal parayla otomatik oynar |
+| 10:30 (ve site açılınca) | Yaklaşan maçlar, oranlar, eksik oyuncular ve sonuçlar çekilir, tahminler yenilenir |
+| Güncellemenin hemen ardından | Sistem kasaları sanal parayla otomatik oynar (bir saat sonrasından 24 saat sonrasına kadarki maçlar; günde bir kez) |
 | 09:00, 15:00, 20:00, 00:30 | Biten maçlar sonuçlandırılır |
 | Her 30 dakikada | Kaçırılan iş varsa tamamlanır |
 | Pazartesi 03:00 | Modeller yeniden eğitilir |
@@ -83,6 +86,7 @@ Yaklaşan maçlar, oranlar ve sakat ya da cezalı oyuncular [API-Football](https
 |---|---|
 | `init` | İlk kurulum: geçmiş veri ve model eğitimi |
 | `catch-up` | Zamanı gelmiş bütün işleri yapar (bulutta GitHub Actions bunu çalıştırır) |
+| `bulut-guncelle` | Bilgisayardaki görev: `HEDEF_DB_URL`'deki bulut veritabanına bağlanıp zamanı gelen işleri yapar (API-Football buradan çağrılır) |
 | `tasi` | Bilgisayardaki veritabanını `HEDEF_DB_URL` adresindeki bulut veritabanına kopyalar |
 | `update` | Yaklaşan maçları, oranları ve eksikleri çeker, tahminleri yeniler |
 | `autoplay` | Sistem kasalarıyla otomatik oyun |
@@ -101,7 +105,10 @@ Yaklaşan maçlar, oranlar ve sakat ya da cezalı oyuncular [API-Football](https
 |---|---|---|
 | Site | [Render](https://render.com) (ücretsiz plan) | Sayfaları gösterir. Şifre sorar. 15 dakika kullanılmazsa uyur; uyurken ilk açılış 30–60 saniye sürer. |
 | Veritabanı | [Neon](https://neon.tech) (ücretsiz PostgreSQL, 0,5 GB) | Maçlar, tahminler, kasalar, kuponlar |
-| Günlük işler | GitHub Actions (public depoda ücretsiz) | Veri güncelleme, otomatik oyun, sonuçlandırma, haftalık eğitim (`.github/workflows/gorevler.yml`) |
+| Günlük işler | GitHub Actions (public depoda ücretsiz) | ESPN'den maçlar, saatler ve oranlar; sonuçlandırma, haftalık eğitim (`.github/workflows/gorevler.yml`). API-Football'a istek atmaz |
+| API-Football ve otomatik kupon | Sizin bilgisayarınız | Windows açılınca bir kez çalışır (aşağıda: Bilgisayardaki görev) |
+
+Sadece API-Football verisi ve otomatik kupon için bilgisayarın açılması gerekir; site, maçlar, ESPN oranları ve sonuçlandırma bilgisayar kapalıyken de çalışır.
 
 Netlify ve Vercel bu proje için uygun değil: Netlify Python sunucusu çalıştırmaz, Vercel'de ise makine öğrenmesi paketleri boyut sınırını aşar ve günlük işler çalışmaz.
 
@@ -124,13 +131,15 @@ Yaklaşık 30–40 MB yüklenir. Hedefte veri varsa komut durur; üzerine yazmak
 |---|---|
 | `DATABASE_URL` | Neon adresi |
 | `SITE_PASSWORD` | Siteye giriş şifreniz. Uzun olsun, başka yerde kullanmadığınız bir şifre. |
-| `API_FOOTBALL_KEY` | API anahtarınız |
+| `API_FOOTBALL_KEY` | API anahtarınız (Render API'ye istek atmaz; anahtar Ayarlar'da da girilebilir, buluttaki veritabanında saklanır) |
 
 Kurulum bitince site `https://futbol-sonuc-tahmin-....onrender.com` gibi bir adreste açılır. Telefonda açın, şifreyi girin; o cihazda 180 gün boyunca giriş açık kalır. Tarayıcı menüsünden "Ana ekrana ekle" ile uygulama gibi açabilirsiniz. Beş yanlış denemeden sonra giriş 15 dakika kapanır.
 
-**5. Günlük işleri açın.** GitHub'da depo → *Settings* → *Secrets and variables* → *Actions* → *New repository secret*: `DATABASE_URL` (Neon adresi) ve `API_FOOTBALL_KEY`. Sonra *Actions* sekmesi → *Gunluk gorevler* → *Run workflow* ile bir kez deneyin.
+**5. Günlük işleri açın.** GitHub'da depo → *Settings* → *Secrets and variables* → *Actions* → *New repository secret*: `DATABASE_URL` (Neon adresi). API anahtarı gerekmez; GitHub API'ye istek atmaz. Sonra *Actions* sekmesi → *Gunluk gorevler* → *Run workflow* ile bir kez deneyin.
 
 **6. Bilgisayardaki otomatik başlatmayı kapatın.** `shell:startup` klasöründeki `arka_plan.vbs` kısayolunu silin. İki sistem birden çalışırsa günlük 100 API isteğini paylaşırlar ve bilgisayardaki eski veritabanı ayrı kupon oynar.
+
+**7. Bilgisayardaki görevi kurun** (API-Football verisi ve otomatik kupon için): aşağıdaki bölüm.
 
 **Buluttaki takvim (Türkiye saati).** GitHub'ın kendi zamanlaması saatlerce gecikebiliyor. Bu yüzden iş akışı dışarıdan, ücretsiz [cron-job.org](https://cron-job.org) ile saatinde başlatılır. Kurulum:
 - GitHub'da *Settings* → *Developer settings* → *Fine-grained tokens* altında yeni anahtar açın: sadece bu depo, *Actions: Read and write*.
@@ -141,9 +150,9 @@ Kurulum bitince site `https://futbol-sonuc-tahmin-....onrender.com` gibi bir adr
 
 | Saat | İş |
 |---|---|
-| 09:10 | Sonuçlandırma, günlük güncelleme (maçlar, oranlar, eksikler, tahminler) |
-| 11:10 | Otomatik oyun (başlamasına en az 1 saat olan maçlarla) |
-| 15:10, 20:10, 23:10 | Sonuçlandırma; maçına 6 saatten az kalan maçların oranı ve tahmini yenilenir |
+| 09:10 | Sonuçlandırma, günlük güncelleme (ESPN: maçlar, saatler, oranlar, milli maç sonuçları; tahminler) |
+| 11:10 | Yedek güncelleme. Otomatik kupon burada kurulmaz, bilgisayar açılınca kurulur (Ayarlar'daki "API verisi yokken de otomatik kupon kur" açıksa GitHub da ESPN oranlarıyla kurar) |
+| 15:10, 20:10, 23:10 | Sonuçlandırma |
 | Haftada bir | Modeller yeniden eğitilir; Salı ve Cuma openfootball ve milli maç verileri yenilenir |
 
 **Bilinmesi gerekenler**
@@ -152,6 +161,24 @@ Kurulum bitince site `https://futbol-sonuc-tahmin-....onrender.com` gibi bir adr
 - Actions kayıtları public depoda herkese görünür. Kayıtlarda sadece maç ve kupon sayıları yazar; şifre ve anahtarlar GitHub tarafından gizlenir.
 - Neon'un 0,5 GB sınırı için bulutta 10 günden eski API yanıtlarının içeriği silinir (istek sayaçları kalır).
 - İndirme işleri bulutta yapılır; sizin internetinizden sadece açtığınız sayfalar harcanır.
+
+## Bilgisayardaki görev
+
+API-Football'a istek yalnızca ev internetine bağlı bilgisayarınızdan gider (yukarıda: Paylaşılan IP). Görev Windows her açıldığında (oturum açılınca) yaklaşık 1,5 dakika sonra bir kez, pencere açmadan çalışır:
+
+1. Buluttaki veritabanına bağlanır (`.env`'deki `HEDEF_DB_URL`).
+2. Biten maçları sonuçlandırır; API-Football'dan maçları, bütün oranları, sakat ve cezalı oyuncuları alır, tahminleri yeniler.
+3. O günün otomatik kuponunu kurar: bir saat sonrasından 24 saat sonrasına kadarki maçlarla, günde bir kez. Önceki kupona giren maçlar tekrar oynanmaz.
+4. Kapanır. Render'daki site aynı veritabanını okuduğu için her şey birkaç dakikada sitede görünür.
+
+**Kurulum:** `.env` dosyasında `HEDEF_DB_URL=<Neon adresi>` olsun (anahtar `.env`'de `API_FOOTBALL_KEY=` olarak ya da sitede Ayarlar'da). Sonra `gorev_kur.bat` dosyasına çift tıklayın. Kaldırmak için `gorev_kaldir.bat`. Kayıtlar: `data\gorev.log`. Elle çalıştırmak: `.venv\Scripts\python -m app.cli bulut-guncelle`.
+
+**Bilinmesi gerekenler**
+
+- Görev bilgisayar uykudan uyanınca değil, Windows açılıp oturum açılınca çalışır.
+- Bilgisayarı açmadığınız gün API verisi gelmez ve otomatik kupon kurulmaz; site ESPN verisiyle çalışmaya devam eder.
+- Bilgisayar telefondan internet paylaşımına, mobil veriye ya da VPN'e bağlıyken görevi çalıştırmayın: IP başkalarıyla paylaşıldığı için hesap askıya alınabilir.
+- API hesap askısı ya da geçersiz anahtar hatası verirse o çalıştırmada başka istek atılmaz; Ayarlar'da "API durumu" satırı nedeni gösterir.
 
 ## Klasör yapısı
 
@@ -176,5 +203,5 @@ data/         sadece sizin bilgisayarınızda: veritabanı, indirilen veriler, m
 - [openfootball](https://github.com/openfootball): kulüp maç geçmişi.
 - [martj42/international_results](https://github.com/martj42/international_results): milli maç geçmişi.
 - [API-Football](https://www.api-football.com): yaklaşan maçlar, oranlar, eksik oyuncular ve sonuçlar. Kendi kullanım koşulları geçerlidir; her kullanıcı kendi anahtarını kullanır.
-- ESPN'in herkese açık maç sonuçları (`site.api.espn.com`, anahtar gerekmez): API-Football'un ücretsiz planının ve openfootball'un vermediği günlerin skorları. Resmi, belgelenmiş bir API değildir; adres değişirse sadece eksik doldurma durur. Elle doldurma: `python -m app.cli espn --sezon 2025 2026 --lig T1`.
+- ESPN'in herkese açık maç verisi (`site.api.espn.com`, anahtar gerekmez): API-Football'un ücretsiz planının ve openfootball'un vermediği günlerin skorları; önümüzdeki 3 günün kulüp ve milli maçları, saatleri, Maç Sonucu ve Alt/Üst oranları (DraftKings; büyük maçlarda Bet365, Çifte Şans dahil), milli maç sonuçları. Resmi, belgelenmiş bir API değildir; adres değişirse sadece eksik doldurma durur. Elle doldurma: `python -m app.cli espn --sezon 2025 2026 --lig T1`.
 - Üçüncü taraf JavaScript kütüphaneleri ve lisansları: [app/web/static/vendor/LISANSLAR.md](app/web/static/vendor/LISANSLAR.md).

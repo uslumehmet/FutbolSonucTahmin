@@ -23,8 +23,8 @@
   <p>Bu aralıkta maç yok.</p>
   {% if next_day %}
   <p>Sıradaki maçlar: <b>{{ next_day.kickoff|local_day }}</b> ({{ next_day.count }} maç). <a href="/?gun=7gun{% if lig %}&lig={{ lig }}{% endif %}">7 günlük listeye bakın</a>.</p>
-  <p class="soft"><small>Oranlar ve eksik oyuncular maçtan bir gün önce gelir; ücretsiz API planı yalnızca dünü, bugünü ve yarını gösteriyor.</small></p>
-  {% elif not has_api_key %}<p>Yaklaşan maçlar için API anahtarı gerekiyor.</p>{% endif %}
+  <p class="soft"><small>Maçlar ve oranlar ESPN'den birkaç gün önce gelir; API-Football oranları ve eksik oyuncular maçtan bir gün önce.</small></p>
+  {% endif %}
 </div>
 {% endif %}
 

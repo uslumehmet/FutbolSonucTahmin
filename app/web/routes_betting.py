@@ -119,8 +119,8 @@ def coupon_create(request: Request, hedef: str = Form("3"), mod: str = Form("saf
                 reason = ("Seçtiğin liglerde bu aralıkta oranlı maç yok. Oranlı maçı olan ligler: "
                           + ", ".join(available) + ". Lig seçimini kaldırıp tekrar deneyin.")
             elif not cands:
-                reason = ("Bu aralıkta oranı ve tahmini olan maç yok. Ücretsiz API planı yalnızca bugünün ve "
-                          "yarının maçlarını verir; oranlar her sabah güncellenir.")
+                reason = ("Bu aralıkta oranı ve tahmini olan maç yok. Oranlar ESPN'den birkaç gün önce, "
+                          "API-Football'dan maçtan bir gün önce gelir; günde birkaç kez güncellenir.")
             elif not coupons and min_prob is not None:
                 reason = (f"Tutma ihtimali en az %{round(min_prob * 100)} olan seçimlerle hedef orana ulaşılamadı "
                           f"({len(pool)} maçta uygun seçim var). Sınırı ya da hedef oranı düşürün, "
@@ -258,10 +258,13 @@ def autoplay_status(s, now) -> dict:
     today = now.astimezone(TZ).date()
     rep = get_value(s, "last_autoplay") or {}
     at = datetime.fromisoformat(rep["at"]) if rep.get("at") else None
-    ran_today = at is not None and at.astimezone(TZ).date() == today
+    reported_today = at is not None and at.astimezone(TZ).date() == today
+    # API verisi olmadığı için kurulmadıysa gün "oynandı" sayılmaz; nedeni gösterilir
+    waiting = [k for k in (rep.get("skipped") or []) if str(k).startswith("Otomatik kupon kurulmadı")]
+    ran_today = reported_today and not waiting
     return {"ran_today": ran_today, "at": at, "coupons": rep.get("coupons", 0) if ran_today else 0,
             "singles": rep.get("singles", 0) if ran_today else 0,
-            "before_hour": now.astimezone(TZ).hour < 11, "next_day": next_match_day(s, now)}
+            "waiting": waiting[0] if reported_today and waiting else None, "next_day": next_match_day(s, now)}
 
 
 @router.get("/kuponlarim", response_class=HTMLResponse)

@@ -90,6 +90,9 @@ class Settings:
     max_model_gap: float = 0.15
     safe_skip_low_data: bool = True  # verisi az maçlar ("veri az") Güvenli moda girmez
     use_market: bool = True  # tahmin, oran gelince bahisçi oranıyla birleştirilir (app/model/market_layer.py)
+    # API-Football verisi olmayan maçlar (yalnızca ESPN oranı: Çifte Şans ve Karşılıklı Gol çoğunlukla yok,
+    # sakatlık bilgisi yok) otomatik kupona girsin mi. Kullanıcı kararı (24 Kasım 2026): başlangıçta kapalı.
+    autoplay_without_api: bool = False
 
 
 DEFAULT_SETTINGS = Settings()
@@ -140,6 +143,19 @@ def set_value(session, key: str, value) -> None:
     else:
         row.value = value
     session.commit()
+
+
+def api_allowed() -> bool:
+    """Bu ortamdan API-Football'a istek atılabilir mi.
+
+    API-Football, aynı IP'de birden fazla ücretsiz hesap görünce hesabı askıya alıyor (23 Kasım 2026'da bizim
+    hesap böyle askıya alındı). GitHub Actions ve Render'ın IP'leri binlerce kullanıcıyla paylaşılır; bu yüzden
+    oralardan hiç istek atılmaz. API'yi yalnızca kullanıcının bilgisayarı çağırır (KURULUM.md: Bilgisayardaki görev).
+    BAHIS_NO_API=1 her ortamda kapatır.
+    """
+    if os.environ.get("BAHIS_NO_API", "").strip() == "1":
+        return False
+    return not (os.environ.get("GITHUB_ACTIONS", "").strip().lower() == "true" or os.environ.get("RENDER", "").strip())
 
 
 def api_key(session=None) -> str | None:

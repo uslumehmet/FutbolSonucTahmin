@@ -59,8 +59,12 @@
     </div>
   </header>
   <main id="icerik">
-    {% if not has_api_key %}
-    <div class="notice">API anahtarı girilmedi: yaklaşan maçlar, oranlar ve eksik oyuncular gelmez. <a href="/ayarlar">Ayarlar'dan ekleyin</a>.</div>
+    {% if api_notice %}
+    <div class="notice"><b>API-Football'dan veri gelmiyor</b> ({{ api_notice.reason }}). Maçlar ve oranlar ESPN'den:
+      Karşılıklı Gol ve çoğu maçta Çifte Şans oranı yok, bu bahisler oynanmıyor; sakatlık ve ceza bilgisi yok.
+      Tahminler daha çok hata yapabilir.
+      {% if api_notice.autoplay %}Otomatik kupon yine de ESPN oranlarıyla kuruluyor.{% else %}Otomatik kupon kurulmuyor.{% endif %}
+      <a href="/ayarlar">Ayarlar</a></div>
     {% endif %}
     {% if hata %}<div class="notice error" role="alert">{{ hata }}</div>{% endif %}
     {% if mesaj %}<div class="notice ok" role="status">{{ mesaj }}</div>{% endif %}
@@ -82,10 +86,10 @@
       <form method="dialog"><button class="modal-x" type="submit" aria-label="Kapat">×</button></form>
     </div>
     <p>Bu sitedeki ihtimaller ve tahminler, geçmiş maç verileri üzerinde çalışan istatistik ve makine öğrenmesi modellerinin hesaplamasıdır; <b>gerçek sonuç değildir</b>. Hiçbir model bir maçın nasıl biteceğini önceden bilemez, her tahmin yanlış çıkabilir.</p>
-    <p>Gösterilen oranlar API-Football üzerinden alınan piyasa oranlarıdır ve her an değişebilir.</p>
+    <p>Gösterilen oranlar API-Football ve ESPN üzerinden alınan piyasa oranlarıdır ve her an değişebilir.</p>
     <p>Kasalar sanaldır: site gerçek parayla oyun oynatmaz, para yatırma ya da çekme yoktur ve hiçbir şirketle bağlantısı yoktur.</p>
     <p>Bu bilgilere dayanarak verdiğiniz kararların sorumluluğu tamamen size aittir; geliştirici hiçbir kayıptan sorumlu tutulamaz.</p>
-    <p class="soft"><small>Veri kaynakları: openfootball, martj42/international_results, API-Football.</small></p>
+    <p class="soft"><small>Veri kaynakları: openfootball, martj42/international_results, API-Football, ESPN.</small></p>
     <form method="dialog" class="modal-foot"><button class="btn" type="submit">Anladım</button></form>
     </div>
   </dialog>

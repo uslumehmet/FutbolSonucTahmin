@@ -12,8 +12,8 @@ from app.betting.settlement import wallet_stats
 from app.betting.stats import (
     LEAGUE_ACCURACY_KEY, calibration_rows, live_calibration, mode_stats, refresh_league_accuracy, singles_stats,
 )
-from app.config import TZ, api_key, get_settings, get_value, save_settings, set_value
-from app.data.api_football import ApiFootball, probe
+from app.config import TZ, api_allowed, api_key, get_settings, get_value, save_settings, set_value
+from app.data.api_football import ApiFootball, api_status, probe
 from app.data.ingest import competition_teams
 from app.data.teams import confirm_new_team, merge_team, promoted_teams, unmatch_team
 from app.model.predict import repredict
@@ -105,6 +105,7 @@ def _settings_ctx(s, probe_result=None, today=None):
             "used": api.used_today(), "limit": api.daily_limit, "month_mb": api.month_bytes() / 1_048_576,
             "last_update": get_value(s, "last_update"), "last_settle": get_value(s, "last_settle"),
             "last_autoplay": get_value(s, "last_autoplay"), "unmatched": _unmatched(s), "probe": probe_result,
+            "api_status": api_status(s), "api_here": api_allowed(),
             "matched": _matched(s, today) if today else [],
             "system_wallets": s.query(Wallet).filter(Wallet.owner != "user").order_by(Wallet.owner, Wallet.id).all(),
             "pick_range": _pick_range(s)}
@@ -152,6 +153,8 @@ async def settings_save(request: Request):
         changes["safe_skip_low_data"] = bool(form.get("safe_skip_low_data"))
     if form.get("use_market_sent"):
         changes["use_market"] = bool(form.get("use_market"))
+    if form.get("autoplay_without_api_sent"):
+        changes["autoplay_without_api"] = bool(form.get("autoplay_without_api"))
     if changes.get("coupon_max_picks", 6) < 1 or any(t < 1.1 for t in changes.get("autoplay_targets", (2.0,))):
         return _go("/ayarlar", hata="Geçersiz değer: maç sayısı en az 1, hedef oran en az 1,10 olmalı.")
     with request.app.state.sf() as s:
@@ -168,6 +171,9 @@ def settings_key(request: Request, api_key_value: str = Form("", alias="api_key"
 
 @router.post("/ayarlar/probe", response_class=HTMLResponse)
 def settings_probe(request: Request):
+    if not api_allowed():
+        return _go("/ayarlar", hata="Bu sunucudan API-Football'a istek atılmıyor (paylaşılan IP, hesap askıya "
+                                    "alınabilir). API'yi bilgisayarınızdaki görev dener.")
     with request.app.state.sf() as s:
         key = api_key(s)
         if not key:

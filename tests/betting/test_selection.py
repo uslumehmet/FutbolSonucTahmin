@@ -142,3 +142,51 @@ def test_candidates_for_match_matches_match_candidates(session):
     session.query(OddsQuote).filter_by(match_id=m.id).delete()
     session.commit()
     assert candidates_for_match(session, m, DEFAULT_SETTINGS) == []
+
+
+def _q(session, mid, book, source, when, **odds):
+    for market, o in odds.items():
+        session.add(OddsQuote(match_id=mid, bookmaker=book, market=market, odds=o, fetched_at=when, source=source))
+    session.commit()
+
+
+def test_fresh_espn_odds_beat_stale_api_odds(session):
+    from app.betting.selection import odds_info
+
+    ids = seed_synthetic_league(session, upcoming=1, with_odds=False)
+    _q(session, ids[0], "B365", "api", NOW - timedelta(days=3), MS1=2.0, MSX=3.3, MS2=3.9)
+    _q(session, ids[0], "DK", "espn", NOW, MS1=2.4, MSX=3.2, MS2=3.1)
+    info = odds_info(session, ids[0])
+    assert (info.source, info.book, info.odds["MS1"]) == ("espn", "DK", 2.4)
+
+
+def test_recent_api_odds_beat_espn_odds(session):
+    from app.betting.selection import odds_info
+
+    ids = seed_synthetic_league(session, upcoming=1, with_odds=False)
+    _q(session, ids[0], "B365", "api", NOW - timedelta(hours=5), MS1=2.0, MSX=3.3, MS2=3.9, KGVAR=1.7)
+    _q(session, ids[0], "DK", "espn", NOW, MS1=2.4, MSX=3.2, MS2=3.1)
+    info = odds_info(session, ids[0])
+    assert (info.source, info.book, info.odds["MS1"], info.odds["KGVAR"]) == ("api", "B365", 2.0, 1.7)
+
+
+def test_espn_bet365_with_double_chance_preferred_over_draftkings(session):
+    from app.betting.selection import odds_info
+
+    ids = seed_synthetic_league(session, upcoming=1, with_odds=False)
+    _q(session, ids[0], "DK", "espn", NOW, MS1=2.4, MSX=3.2, MS2=3.1)
+    _q(session, ids[0], "B365", "espn", NOW - timedelta(hours=1), MS1=2.3, MSX=3.25, MS2=3.2, CS1X=1.36)
+    info = odds_info(session, ids[0])
+    assert (info.source, info.book, info.odds["CS1X"]) == ("espn", "B365", 1.36)
+
+
+def test_espn_bet365_is_completed_with_draftkings_totals(session):
+    """ESPN'deki Bet365'te çoğu zaman Alt/Üst yok; o maçta DraftKings'in 2.5 Alt/Üst oranı kaybolmasın."""
+    from app.betting.selection import odds_info
+
+    ids = seed_synthetic_league(session, upcoming=1, with_odds=False)
+    _q(session, ids[0], "DK", "espn", NOW, MS1=2.4, MSX=3.2, MS2=3.1, UST25=1.9, ALT25=1.9)
+    _q(session, ids[0], "B365", "espn", NOW, MS1=2.3, MSX=3.25, MS2=3.2, CS1X=1.36, CS12=1.3, CSX2=1.6)
+    info = odds_info(session, ids[0])
+    assert info.odds == {"MS1": 2.3, "MSX": 3.25, "MS2": 3.2, "CS1X": 1.36, "CS12": 1.3, "CSX2": 1.6,
+                         "UST25": 1.9, "ALT25": 1.9}

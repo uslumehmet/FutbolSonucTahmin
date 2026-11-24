@@ -20,10 +20,26 @@ def test_catch_up_runs_missing_jobs(session_factory, monkeypatch):
     assert {"refresh_sources", "weekly_retrain"} <= set(ran)
 
 
-def test_catch_up_before_11_skips_autoplay(session_factory, monkeypatch):
+def test_catch_up_in_the_morning_plays_right_after_update(session_factory, monkeypatch):
+    """Bilgisayar sabah açılınca kupon beklemeden kurulur (eskiden 11:00'i bekliyordu)."""
     ran = _stub(monkeypatch)
     jobs.catch_up(session_factory, datetime(2026, 11, 16, 9, 0, tzinfo=TZ))
-    assert "daily_autoplay" not in ran and "daily_update" in ran
+    assert ran.index("daily_update") < ran.index("daily_autoplay")
+
+
+def test_catch_up_at_night_updates_and_plays(session_factory, monkeypatch):
+    ran = _stub(monkeypatch)
+    jobs.catch_up(session_factory, datetime(2026, 11, 16, 2, 30, tzinfo=TZ))
+    assert ran.index("daily_update") < ran.index("daily_autoplay")
+
+
+def test_catch_up_at_night_does_not_repeat_a_fresh_update(session_factory, monkeypatch):
+    ran = _stub(monkeypatch)
+    with session_factory() as s:
+        s.add(JobRun(job="update", run_key="2026-11-16", finished_at=datetime(2026, 11, 16, 0, 40, tzinfo=TZ)))
+        s.commit()
+    jobs.catch_up(session_factory, datetime(2026, 11, 16, 2, 30, tzinfo=TZ))
+    assert "daily_update" not in ran
 
 
 def test_catch_up_does_not_repeat_done_jobs(session_factory, monkeypatch):
@@ -172,3 +188,28 @@ def test_settle_skips_espn_when_api_works(session_factory, monkeypatch):
     _, espn_calls = _settle_setup(session_factory, monkeypatch, [])
     jobs.settle_job(session_factory, datetime(2026, 11, 21, 20, 10, tzinfo=TZ))
     assert espn_calls == []
+
+
+def test_daily_update_takes_upcoming_matches_and_odds_from_espn(session_factory, monkeypatch):
+    from app.config import get_value
+    from app.data import espn as espn_mod
+    from app.data import espn_upcoming, ingest_api
+    from app.model import predict
+
+    calls = []
+    monkeypatch.setattr(ingest_api, "ingest_results", lambda s, api, now: ingest_api.IngestReport())
+    monkeypatch.setattr(espn_mod, "ingest_espn", lambda *a, **k: espn_mod.EspnReport())
+    monkeypatch.setattr(espn_mod, "ingest_summaries", lambda *a, **k: espn_mod.SummaryReport())
+    monkeypatch.setattr(predict, "predict_upcoming", lambda *a, **k: [])
+
+    def fake_upcoming(s, now, **kw):
+        calls.append(kw)
+        return espn_upcoming.UpcomingReport(matches=7, odds=5, created=1, unresolved=["Süper Lig 2026: X"])
+
+    monkeypatch.setattr(espn_upcoming, "ingest_espn_upcoming", fake_upcoming)
+    jobs.daily_update(session_factory, datetime(2026, 11, 24, 9, 7, tzinfo=TZ))
+    assert calls and calls[0]["api_is_live"] is False
+    with session_factory() as s:
+        rep = get_value(s, "last_update")
+    assert any("ESPN" in f and "7 yaklaşan maç" in f and "5 maçta oran" in f for f in rep["fallbacks"])
+    assert "ESPN eşleşmeyen: Süper Lig 2026: X" in rep["errors"]

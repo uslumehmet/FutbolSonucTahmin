@@ -1,13 +1,16 @@
 # Günlük işler: veri güncelleme, otomatik oyun, sonuçlandırma, haftalık yeniden eğitim.
 # Bilgisayar kapalıyken de çalışır. Saatler UTC'dir (Türkiye = UTC+3).
 # Her çalışma "zamanı gelmiş ne varsa" yapar (python -m app.cli catch-up); bir çalışma gecikirse sonraki tamamlar.
+# API-Football'a buradan istek atılmaz (BAHIS_NO_API): GitHub'ın IP'leri paylaşılıyor ve ücretsiz hesap 23 Kasım
+# 2026'da bu yüzden askıya alındı. Maçlar, saatler ve oranlar ESPN'den; API verisi ve otomatik kupon kullanıcının
+# bilgisayarındaki görevden gelir (KURULUM.md: Bilgisayardaki görev).
 name: Gunluk gorevler
 
 on:
   schedule:
     # GitHub zamanlanmış çalıştırmaları bazen hiç başlatmıyor (19 Kasım: 09:07, 11:07 ve 12:37 gelmedi,
     # ilk çalıştırma 18:38'de oldu). Sabah ve öğlen yedek saatler bu yüzden var; iş yapılmışsa yedek bir şey yapmaz.
-    - cron: "7 6 * * *"    # 09:07  sonuçlandırma + günlük güncelleme (maçlar, oranlar, eksikler)
+    - cron: "7 6 * * *"    # 09:07  sonuçlandırma + günlük güncelleme (ESPN: maçlar, saatler, oranlar)
     - cron: "43 6 * * *"   # 09:43  yedek: günlük güncelleme
     - cron: "7 8 * * *"    # 11:07  otomatik oyun
     - cron: "41 8 * * *"   # 11:41  yedek: otomatik oyun
@@ -54,7 +57,7 @@ jobs:
       - name: Zamanı gelen işleri yap
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          BAHIS_NO_API: "1"   # paylaşılan IP: API-Football'a istek atılmaz
         run: |
           if [ -z "$DATABASE_URL" ]; then echo "DATABASE_URL secret'ı eksik (KURULUM.md: İnternete açma)"; exit 1; fi
           python -m app.cli catch-up

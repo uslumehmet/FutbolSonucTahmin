@@ -26,6 +26,46 @@ class ApiError(Exception):
     pass
 
 
+class ApiBlocked(ApiError):
+    """Hesap askıda ya da anahtar geçersiz: bu çalıştırmada başka istek atılmaz (23 Kasım'da 35 istek boşa gitti)."""
+
+
+API_STATUS_KEY = "api_status"  # {"ok": bool, "at": iso, "last_ok": iso|None, "message": str|None}
+API_LIVE_HOURS = 36  # son başarılı yanıt bundan eskiyse API verisi "gelmiyor" sayılır
+
+
+def _account_error(errors) -> str | None:
+    """Hesabın kendisiyle ilgili hata (askı, geçersiz/eksik anahtar); varsa mesajı döner."""
+    if not isinstance(errors, dict):
+        return None
+    for key in ("access", "token"):
+        if errors.get(key):
+            return str(errors[key])
+    text = " ".join(str(v) for v in errors.values()).lower()
+    return " ".join(str(v) for v in errors.values()) if "suspended" in text else None
+
+
+def _record_status(session, now: datetime, ok: bool, message: str | None = None) -> None:
+    prev = get_value(session, API_STATUS_KEY) or {}
+    set_value(session, API_STATUS_KEY, {"ok": ok, "at": now.isoformat(), "message": message,
+                                        "last_ok": now.isoformat() if ok else prev.get("last_ok")})
+
+
+def api_status(session) -> dict | None:
+    return get_value(session, API_STATUS_KEY)
+
+
+def api_live(session, now: datetime) -> bool:
+    """API-Football son API_LIVE_HOURS saatte cevap verdi ve o zamandan beri hata vermedi mi."""
+    st = api_status(session) or {}
+    if not st.get("ok") or not st.get("last_ok"):
+        return False
+    try:
+        return datetime.fromisoformat(st["last_ok"]) >= now - timedelta(hours=API_LIVE_HOURS)
+    except (TypeError, ValueError):
+        return False
+
+
 def _daily_limit_error(errors) -> bool:
     """API-Football günlük sınır dolunca 200 + {"errors": {"requests": "...request limit for the day..."}} döner."""
     if not isinstance(errors, dict):
@@ -58,6 +98,7 @@ class ApiFootball:
         self._recent: list[datetime] = []
         self._transport = transport
         self._client: httpx.Client | None = None
+        self.blocked: str | None = None  # hesap hatası alındıysa mesajı; sonraki istekler atılmaz
 
     @property
     def client(self) -> httpx.Client:
@@ -114,6 +155,8 @@ class ApiFootball:
         hit = self.cached(endpoint, params, max_age)
         if hit is not None:
             return hit
+        if self.blocked:
+            raise ApiBlocked(self.blocked)
         if self.remaining_today() <= 0:
             raise QuotaExceeded(f"günlük API sınırı doldu ({self.daily_limit})")
         for attempt in range(2):
@@ -172,7 +215,13 @@ class ApiFootball:
             row = self.session.query(ApiCall).order_by(ApiCall.id.desc()).first()
             row.status_code = 299
             self.session.commit()
+            blocked = _account_error(data.get("errors"))
+            if blocked:
+                self.blocked = blocked
+                _record_status(self.session, self.clock(), False, blocked)
+                raise ApiBlocked(blocked)
             raise ApiError(str(data["errors"]))
+        _record_status(self.session, self.clock(), True)
         return data
 
     def get_all_pages(self, endpoint: str, params: dict, max_age: timedelta) -> list[dict]:

@@ -145,7 +145,8 @@ def create_app(session_factory=None, start_scheduler: bool = True, clock=None) -
     def render(request: Request, name: str, ctx: dict, status: int = 200) -> HTMLResponse:
         with request.app.state.sf() as s:
             has_key = bool(api_key(s))
-        base = {"request": request, "nav": ctx.pop("nav", ""), "has_api_key": has_key,
+            notice = views.api_notice(s, request.app.state.clock(), has_key)
+        base = {"request": request, "nav": ctx.pop("nav", ""), "has_api_key": has_key, "api_notice": notice,
                 "hata": request.query_params.get("hata"), "mesaj": request.query_params.get("mesaj")}
         return request.app.state.templates.TemplateResponse(request, name, {**base, **ctx}, status_code=status)
 

@@ -6,9 +6,10 @@ from datetime import UTC, datetime, time, timedelta
 from urllib.parse import quote_plus
 
 from app.betting.selection import (
-    Candidate, candidates_for, eligible, implied_probs, latest_odds, safe_pick, value_pick,
+    Candidate, candidates_for, eligible, implied_probs, odds_info, safe_pick, value_pick,
 )
 from app.config import TZ, get_settings
+from app.data.api_football import api_live
 from app.model.explain import explain
 from app.model.features import head_to_head, recent_matches
 from app.model.injuries import MissingImpact
@@ -20,10 +21,16 @@ DAY_WINDOWS = {"bugun": (0, 1), "yarin": (1, 2), "3gun": (0, 3), "7gun": (0, 7)}
 DAY_LABELS = {"bugun": "Bugün", "yarin": "Yarın", "3gun": "3 gün"}  # kupon sayfası (oran gereken aralık)
 MATCH_DAY_LABELS = {**DAY_LABELS, "7gun": "7 gün"}  # maçlar sayfası
 SCHEDULE_FLAG = "oran 1 gün önce gelir"
+NO_API_FLAG = "API verisi yok"
+NO_API_TEXT = ("API-Football'dan veri gelmedi; oranlar ESPN'den. Karşılıklı Gol ve (birkaç büyük maç dışında) Çifte "
+               "Şans oranı yok, bu bahisler oynanmıyor. Sakatlık ve ceza bilgisi yok; tahminler daha çok hata "
+               "yapabilir.")
+BOOK_LABELS = {"B365": "Bet365", "AVG": "bahisçi ortalaması", "DK": "DraftKings"}
 LEGACY_FLAGS = {"eksik verisi yok": MISSING_UNKNOWN_FLAG}  # eski tahminlerde saklanan yazılar
 FLAG_TIPS = {
-    SCHEDULE_FLAG: "Bu maç sezon fikstüründen geldi; saat değişebilir. Oranlar ve eksik oyuncular maçtan bir gün "
-                   "önce API-Football'dan gelir, kupon da o zaman kurulabilir.",
+    SCHEDULE_FLAG: "API-Football oranları (Çifte Şans ve Karşılıklı Gol dahil) ve eksik oyuncular maçtan bir gün "
+                   "önce gelir; otomatik kupon o zaman kurulur. O zamana kadar varsa ESPN oranları gösterilir.",
+    NO_API_FLAG: NO_API_TEXT,
     MISSING_UNKNOWN_FLAG: "Eksik oyunculardan bazılarının istatistiği gelmedi; bu oyuncuların tahmine etkisi "
                           "hesaplanmadı. Maç sayfasından önemlerini seçip elle ekleyebilirsiniz.",
 }
@@ -32,6 +39,25 @@ SHOWN = ("scheduled", "finished", "postponed", "cancelled", "abandoned")
 
 def shown_flags(flags) -> list[str]:
     return [LEGACY_FLAGS.get(f, f) for f in (flags or [])]
+
+
+def api_notice(session, now: datetime, has_key: bool) -> dict | None:
+    """Sitenin üstündeki uyarı: API-Football verisi gelmiyorsa neden ve neyin eksik olduğu; geliyorsa None."""
+    from app.data.api_football import api_status
+
+    if has_key and api_live(session, now):
+        return None
+    st = api_status(session) or {}
+    msg = str(st.get("message") or "")
+    if not has_key:
+        reason = "API anahtarı girilmedi"
+    elif st.get("ok") is False and "suspend" in msg.lower():
+        reason = "hesap askıda"
+    elif st.get("ok") is False and msg:
+        reason = "anahtar geçersiz ya da API hata veriyor"
+    else:
+        reason = "son 36 saatte API'den yanıt alınmadı"
+    return {"reason": reason, "autoplay": get_settings(session).autoplay_without_api}
 
 
 def day_window(now: datetime, gun: str) -> tuple[datetime, datetime]:
@@ -48,17 +74,33 @@ class Picks:
     value: Candidate | None
     book: str | None
     cands: list[Candidate]
+    source: str | None = None  # oranların kaynağı: api | espn | None (oran yok)
 
 
 def picks_for(session, match: Match, probs: dict, low_data: bool = False) -> Picks:
     s = get_settings(session)
-    lo = latest_odds(session, match.id)
-    if not probs or lo is None:
-        return Picks(None, None, lo[0] if lo else None, [])
-    cands = candidates_for(match.id, probs, lo[1], s.odds_adjust_pct, low_data)
+    info = odds_info(session, match.id)
+    if not probs or info is None:
+        return Picks(None, None, info.book if info else None, [], info.source if info else None)
+    cands = candidates_for(match.id, probs, info.odds, s.odds_adjust_pct, low_data)
     safe = safe_pick(eligible(cands, "safe", s), s.safe_min_odds)
     value = value_pick(eligible(cands, "value", s), s.value_min_prob, s.value_min_edge)
-    return Picks(safe, value, lo[0], cands)
+    return Picks(safe, value, info.book, cands, info.source)
+
+
+def odds_flags(m: Match, pk: Picks, has_probs: bool, live: bool) -> list[str]:
+    """Henüz oynanmamış maçın oran etiketleri.
+
+    API yanıt veriyorsa API oranı olmayan maçta "oran 1 gün önce gelir"; vermiyorsa "API verisi yok"
+    (Çifte Şans, Karşılıklı Gol ve sakatlık bilgisi yok). Hiç oran yoksa ayrıca "oran yok".
+    """
+    if m.status != "scheduled" or pk.source == "api":
+        return []
+    if not live:
+        return [NO_API_FLAG] + (["oran yok"] if has_probs and not pk.cands else [])
+    if pk.source is None and m.api_fixture_id is not None:
+        return ["oran yok"] if has_probs else []  # API'den gelmiş maç ama oranı yok
+    return [SCHEDULE_FLAG]
 
 
 def match_rows(session, now: datetime, gun: str, lig: str | None) -> list[dict]:
@@ -69,6 +111,7 @@ def match_rows(session, now: datetime, gun: str, lig: str | None) -> list[dict]:
     if lig:
         q = q.filter(Competition.code == lig)
     groups: dict[int, dict] = {}
+    live = api_live(session, now)
     for m in q.order_by(Match.kickoff_utc).all():
         pred = latest_prediction(session, m.id)
         probs = pred.probs if pred else {}
@@ -76,10 +119,7 @@ def match_rows(session, now: datetime, gun: str, lig: str | None) -> list[dict]:
         if m.unmatched and "eşleşmedi" not in flags:
             flags.append("eşleşmedi")
         pk = picks_for(session, m, probs, "veri az" in flags)
-        if m.status == "scheduled" and m.api_fixture_id is None and not pk.cands:
-            flags.append(SCHEDULE_FLAG)  # sezon fikstüründen gelen maç: oran ve kesinleşmiş saat henüz yok
-        elif probs and not pk.cands and m.status == "scheduled":
-            flags.append("oran yok")
+        flags += odds_flags(m, pk, bool(probs), live)
         missing = session.query(MissingPlayer).filter_by(match_id=m.id, active=True).count()
         g = groups.setdefault(m.competition_id, {"competition": m.competition, "rows": []})
         g["rows"].append({"m": m, "probs": probs, "flags": flags, "picks": pk, "missing": missing})
@@ -137,12 +177,12 @@ def match_detail(session, match_id: int, now: datetime) -> dict | None:
     probs = pred.probs if pred else {}
     pk = picks_for(session, m, probs, bool(pred and "veri az" in (pred.flags or [])))
     odds = {c.market: c.odds for c in pk.cands}
-    raw = latest_odds(session, m.id)
-    implied = implied_probs(raw[1]) if raw else {}
-    from app.models import OddsQuote
-    last_q = (session.query(OddsQuote).filter_by(match_id=m.id)
-              .order_by(OddsQuote.fetched_at.desc()).first())
-    odds_time = last_q.fetched_at if last_q else None
+    info = odds_info(session, m.id)
+    implied = implied_probs(info.odds) if info else {}
+    odds_time = info.fetched_at if info else None
+    book_label = None
+    if info is not None:
+        book_label = BOOK_LABELS.get(info.book, info.book) + (" (ESPN)" if info.source == "espn" else "")
     model_probs = (pred.model_probs if pred else None) or {}
     markets = []
     for key in MARKETS:
@@ -182,6 +222,7 @@ def match_detail(session, match_id: int, now: datetime) -> dict | None:
             "markets": markets, "picks": pk, "form": form, "h2h": h2h,
             "blended": bool(model_probs),
             "sections": sections, "h2h_rows": h2h_rows(session, home.id, away.id, before, 6),
-            "odds_time": odds_time,
+            "odds_time": odds_time, "book_label": book_label,
+            "no_api_odds": m.status == "scheduled" and pk.source != "api", "no_api_text": NO_API_TEXT,
             "missing": missing, "lines": lines, "tm_home": transfermarkt_url(home.name),
             "tm_away": transfermarkt_url(away.name)}

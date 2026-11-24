@@ -11,8 +11,13 @@
     <button class="btn" type="submit">Kaydet</button>
   </form>
   {% if key_hint %}<p class="soft" style="margin-top:.5rem"><small>Kayıtlı anahtar: {{ key_hint }}</small></p>
-  <form method="post" action="/ayarlar/probe" style="margin-top:.5rem"><button class="btn light" type="submit">Ücretsiz planın kapsamını dene</button>
-    <small class="soft">yaklaşık 6–8 istek harcar</small></form>{% endif %}
+  {% if api_here %}<form method="post" action="/ayarlar/probe" style="margin-top:.5rem"><button class="btn light" type="submit">Ücretsiz planın kapsamını dene</button>
+    <small class="soft">yaklaşık 6–8 istek harcar</small></form>
+  {% else %}<p class="soft"><small>Bu sunucu API-Football'a istek atmaz: paylaşılan IP'den gelen istekler ücretsiz hesabın askıya alınmasına yol açıyor. API'yi bilgisayarınızdaki görev çağırır (KURULUM.md: Bilgisayardaki görev).</small></p>{% endif %}{% endif %}
+  <p style="margin-top:.5rem">API durumu:
+    {% if not api_status %}henüz yanıt alınmadı.
+    {% elif api_status.ok %}yanıt veriyor (son yanıt {{ api_status.at|local_iso }}).
+    {% else %}<b>yanıt vermiyor</b> ({{ api_status.at|local_iso }}: {{ api_status.message }}){% if api_status.last_ok %}; son başarılı yanıt {{ api_status.last_ok|local_iso }}{% endif %}.{% endif %}</p>
   {% if probe %}
   <table style="margin-top:.75rem">{% for k, v in probe.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table>
   {% endif %}
@@ -41,6 +46,12 @@
       <label class="check"><input type="checkbox" name="safe_skip_low_data" value="1" {% if s.safe_skip_low_data %}checked{% endif %}>
         Verisi az maçları Güvenli moda alma</label>
       <small class="soft">Lige yeni çıkan ya da geçmişi az olan takımların maçları ("veri az" etiketi). Değerli modu etkilemez.</small>
+    </div>
+    <div class="inline-form">
+      <input type="hidden" name="autoplay_without_api_sent" value="1">
+      <label class="check"><input type="checkbox" name="autoplay_without_api" value="1" {% if s.autoplay_without_api %}checked{% endif %}>
+        API verisi yokken de otomatik kupon kur</label>
+      <small class="soft">Kapalıyken (önerilen) yalnızca oranı API-Football'dan gelen maçlar otomatik kupona girer. Açıkken ESPN oranlarıyla da kurulur: Karşılıklı Gol ve çoğu maçta Çifte Şans oranı yok, sakatlık bilgisi yok; tahminler daha çok hata yapabilir.</small>
     </div>
     <div class="inline-form">
       <input type="hidden" name="use_market_sent" value="1">
